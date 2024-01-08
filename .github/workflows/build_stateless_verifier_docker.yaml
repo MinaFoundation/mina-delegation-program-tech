@@ -1,0 +1,32 @@
+name: Build Stateless Verifier Docker Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      mina_branch:
+        description: 'Branch of MinaProtocol/mina to checkout'
+        required: true
+        default: 'sventimir/stateless-verification-tool'
+
+env:
+  MINA_BRANCH: ${{ github.event.inputs.mina_branch }}
+  
+jobs:
+  build:
+    runs-on: minafoundation-default-runners
+
+    steps:
+    - name: Checkout Mina
+      uses: actions/checkout@v2
+      with:
+        repository: MinaProtocol/mina
+        ref: ${{ env.MINA_BRANCH }}
+
+    - name: Build and Push Docker image
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        file: dockerfiles/Dockerfile-delegation-stateless-verifier
+        build-args: MINA_BRANCH=${{ env.MINA_BRANCH }}
+        tags: user/delegation-verify:latest
+        push: false
