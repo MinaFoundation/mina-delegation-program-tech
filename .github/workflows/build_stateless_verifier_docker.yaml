@@ -4,29 +4,65 @@ on:
   workflow_dispatch:
     inputs:
       mina_branch:
-        description: 'Branch of MinaProtocol/mina to checkout'
+        description: 'Branch of MinaProtocol/mina to build from'
         required: true
         default: 'sventimir/stateless-verification-tool'
+      dune_profile:
+        description: 'Dune profile to build with'
+        required: true
+        default: 'devnet'
+      push:
+        description: 'Push to ECR'
+        required: true
+        default: true
+        type: boolean
 
 env:
   MINA_BRANCH: ${{ github.event.inputs.mina_branch }}
-  
+  DUNE_PROFILE: ${{ github.event.inputs.dune_profile }}
+  PUSH: ${{ github.event.inputs.push }}
+  ECR_REPOSITORY_URL: 673156464838.dkr.ecr.us-west-2.amazonaws.com
+  ECR_REPOSITORY_NAME: delegation-verify
+
 jobs:
   build:
     runs-on: minafoundation-default-runners
 
     steps:
-    - name: Checkout Mina
-      uses: actions/checkout@v2
+    - name: 📥 Checkout Mina Repository
+      uses: actions/checkout@v4
       with:
         repository: MinaProtocol/mina
         ref: ${{ env.MINA_BRANCH }}
 
-    - name: Build and Push Docker image
-      uses: docker/build-push-action@v2
+    - name: 🏷️ Generate Tag
+      run: |
+        VERSION=$(grep "^version:" ./src/app/delegation_verify/delegation_verify.opam | cut -d '"' -f 2)
+        MINA_SHA=$(git rev-parse HEAD | cut -c1-7)
+        TAG="${VERSION}-${MINA_SHA}-${DUNE_PROFILE}"
+        echo "TAG=${TAG}" >> $GITHUB_ENV
+    
+    - name: 🔑 ECR Login
+      if: env.PUSH == 'true'
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: 🔍 Check if Tag already exists
+      if: env.PUSH == 'true'
+      id: checktag
+      uses: tyriis/docker-image-tag-exists@main
+      with:
+        registry: ${{ env.ECR_REPOSITORY_URL}}
+        repository: ${{ env.ECR_REPOSITORY_NAME }}
+        tag: ${{ env.TAG }}
+
+    - name: 🛠️ Build and Push Docker image
+      uses: docker/build-push-action@v5
       with:
         context: .
         file: dockerfiles/Dockerfile-delegation-stateless-verifier
-        build-args: MINA_BRANCH=${{ env.MINA_BRANCH }}
-        tags: user/delegation-verify:latest
-        push: false
+        build-args: |
+          MINA_BRANCH=${{ env.MINA_BRANCH }}
+          DUNE_PROFILE=${{ env.DUNE_PROFILE }}
+        tags: ${{ env.ECR_REPOSITORY_URL }}/${{ env.ECR_REPOSITORY_NAME }}:${{ env.TAG }}
+        push: ${{ env.PUSH == 'true' && steps.checktag.outputs.tag == 'not found' }}
