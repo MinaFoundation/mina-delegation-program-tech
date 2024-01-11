@@ -1,0 +1,19 @@
+{
+  "network_name": "{{config_network_name}}",
+  "analyzer_output_gsheet_id": "1UwpcBIXlbYN541W1uZVZCv7H_uLVosOnvEhVvFzE8FM",
+  "delegation_whitelist_disabled": true,
+  "aws_keyspaces": {
+    "keyspace": "{{aws_keyspace}}",
+    "ssl_certificate_path": "/local-network/uptime_service_config/sf-class2-root.crt",
+    "region": "{{aws_region}}",
+    "access_key_id": "{{aws_access_key_id}}",
+    "secret_access_key": "{{aws_secret_access_key}}"
+  },
+  "aws": {
+    "account_id": "{{aws_account_id}}",
+    "bucket_name_suffix": "{{bucket_name_suffix}}",
+    "region": "{{aws_region}}",
+    "access_key_id": "{{aws_access_key_id}}",
+    "secret_access_key": "{{aws_secret_access_key}}"
+  }
+}
