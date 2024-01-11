@@ -5,13 +5,36 @@ import pystache
 import shutil
 
 @task
-def setup_uptime_service(ctx):
+def setup_network(ctx):
     migrate_keyspaces(ctx, direction="down")
     migrate_keyspaces(ctx, direction="up")
     clear_s3_bucket(ctx)
     setup_topology(ctx)
 
     print("Uptime service setup completed.")
+
+@task
+def network(ctx, action):
+    config_network_name = os.getenv('CONFIG_NETWORK_NAME')
+
+    if not config_network_name:
+        raise ValueError("CONFIG_NETWORK_NAME environment variable must be set.")
+
+    if action == "setup":
+        setup_network(ctx)
+    elif action == "create":
+        with ctx.cd('./runtime'):
+            ctx.run(f"minimina network create -t topology/topology.json -g topology/genesis_ledger.json -n {config_network_name}", echo=True)
+    elif action == "start":
+        ctx.run(f"minimina network start -n {config_network_name}", echo=True)
+    elif action == "stop":
+        ctx.run(f"minimina network stop -n {config_network_name}", echo=True)
+    elif action == "delete":
+        ctx.run(f"minimina network delete -n {config_network_name}", echo=True)
+    elif action == "status":
+        ctx.run(f"minimina network status -n {config_network_name}", echo=True)
+    else:
+        raise ValueError("Invalid action. Possible values are 'create', 'start', 'stop', 'delete', 'status'.")
 
 @task
 def migrate_keyspaces(ctx, direction):
