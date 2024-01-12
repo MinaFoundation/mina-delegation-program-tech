@@ -4,14 +4,31 @@ import os
 import pystache
 import shutil
 
-@task
-def setup_network(ctx):
-    migrate_keyspaces(ctx, direction="down")
-    migrate_keyspaces(ctx, direction="up")
-    clear_s3_bucket(ctx)
-    setup_topology(ctx)
+# Constants
+RUNTIME_DIR = "./runtime"
+COORDINATOR_REPO_URL = "https://github.com/MinaFoundation/uptime-service-validation.git"
+COORDINATOR_RUNTIME_DIR = f"{RUNTIME_DIR}/uptime-service-validation"
 
-    print("Uptime service setup completed.")
+@task
+def e2e_test(ctx, action):
+    if action == "setup":
+        network(ctx, "setup")
+        network(ctx, "create")
+        start_postgres(ctx)
+        clone_coordinator_repo(ctx)
+        prepare_coordinator_postgres(ctx)
+    elif action == "start":
+        network(ctx, "start")
+        start_coordinator(ctx)
+    elif action == "stop":
+        network(ctx, "stop")
+        stop_postgres(ctx)
+    elif action == "teardown":
+        network(ctx, "delete")
+        stop_postgres(ctx)
+        clear_s3_bucket(ctx)
+        migrate_keyspaces(ctx, direction="down")
+        clear_runtime(ctx)
 
 @task
 def network(ctx, action):
@@ -23,7 +40,7 @@ def network(ctx, action):
     if action == "setup":
         setup_network(ctx)
     elif action == "create":
-        with ctx.cd('./runtime'):
+        with ctx.cd(RUNTIME_DIR):
             ctx.run(f"minimina network create -t topology/topology.json -g topology/genesis_ledger.json -n {config_network_name}", echo=True)
     elif action == "start":
         ctx.run(f"minimina network start -n {config_network_name}", echo=True)
@@ -35,6 +52,15 @@ def network(ctx, action):
         ctx.run(f"minimina network status -n {config_network_name}", echo=True)
     else:
         raise ValueError("Invalid action. Possible values are 'create', 'start', 'stop', 'delete', 'status'.")
+
+@task
+def setup_network(ctx):
+    migrate_keyspaces(ctx, direction="down")
+    migrate_keyspaces(ctx, direction="up")
+    clear_s3_bucket(ctx)
+    setup_topology(ctx)
+
+    print("Uptime service setup completed.")
 
 @task
 def migrate_keyspaces(ctx, direction):
@@ -80,7 +106,7 @@ def clear_s3_bucket(ctx):
 @task
 def setup_topology(ctx):
     source_dir = "./test/topology"
-    destination_dir = "./runtime/topology"
+    destination_dir = f"{RUNTIME_DIR}/topology"
 
     # Create the destination directory if it doesn't exist
     os.makedirs(destination_dir, exist_ok=True)
@@ -128,3 +154,65 @@ def setup_topology(ctx):
 
     print("Updated JSON files in the runtime topology directory.")
 
+@task
+def clear_runtime(ctx):
+    ctx.run(f"rm -rf {RUNTIME_DIR}", echo=True)
+    print(f"Runtime directory '{RUNTIME_DIR}' cleared.")
+
+@task
+def start_postgres(ctx):
+    # Get environment variables
+    postgres_host = os.getenv('POSTGRES_HOST')
+    postgres_port = os.getenv('POSTGRES_PORT')
+    postgres_db = os.getenv('POSTGRES_DB')
+    postgres_user = os.getenv('POSTGRES_USER')
+    postgres_password = os.getenv('POSTGRES_PASSWORD')
+
+    # Run the PostgreSQL Docker container
+    ctx.run(
+        f"docker run --name postgres-container "
+        f"-e POSTGRES_DB={postgres_db} "
+        f"-e POSTGRES_USER={postgres_user} "
+        f"-e POSTGRES_PASSWORD={postgres_password} "
+        f"-p {postgres_port}:5432 "
+        "-d postgres", 
+        echo=True
+    )
+
+    print(f"PostgreSQL container started on {postgres_host}:{postgres_port} "
+          f"with database '{postgres_db}' and user '{postgres_user}'.")
+
+@task
+def stop_postgres(ctx):
+    # Stop the PostgreSQL Docker container
+    ctx.run("docker stop postgres-container", echo=True)
+    # Remove the PostgreSQL Docker container
+    ctx.run("docker rm postgres-container", echo=True)
+
+    print("PostgreSQL container stopped and removed.")
+
+@task
+def clone_coordinator_repo(ctx):
+    coordinator_branch = os.getenv('COORDINATOR_BRANCH')
+    if not coordinator_branch:
+        raise ValueError("COORDINATOR_BRANCH environment variable must be set.")
+
+    repo_url = "https://github.com/MinaFoundation/uptime-service-validation.git"
+    destination_dir = "./runtime/uptime-service-validation"
+
+    # Clone the specific branch of the repository into the runtime directory
+    ctx.run(f"git clone --branch {coordinator_branch} {COORDINATOR_REPO_URL} {COORDINATOR_RUNTIME_DIR}", echo=True)
+
+    print(f"Repository cloned into {COORDINATOR_RUNTIME_DIR} on branch '{coordinator_branch}'.")
+
+@task
+def prepare_coordinator_postgres(ctx):
+    with ctx.cd(COORDINATOR_RUNTIME_DIR):
+        ctx.run("invoke create-database", echo=True)
+        ctx.run("invoke init-database", echo=True)
+
+@task
+def start_coordinator(ctx):
+    with ctx.cd(COORDINATOR_RUNTIME_DIR):
+        ctx.run("poetry install", echo=True)
+        ctx.run("poetry run start", echo=True)
