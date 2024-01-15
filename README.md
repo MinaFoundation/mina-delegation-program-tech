@@ -27,8 +27,16 @@ Before running the E2E tests, ensure you have the following:
 1. **Poetry**: Run `poetry shell` in the repository's root to set up the Python environment and install all necessary dependencies.
 2. **Docker**: Required for testing the `uptime-service-backend`, `stateless_verifier`. The test also sets up `postgres` docker image
 which is required for `uptime-service-validation` (coordinator).
+3. **Login to ECR**: Make sure to be logged into ECR to be able to get required docker images for `uptime-service-backend` and `stateless_verifier`.
 
 ### Test Execution Process
+
+Before starting make sure to have following env variables set:
+ - `E2E_SECRET` - secret required for decoding `./test/config/.env` file hodling env variables required to set connection to Amazon Keyspaces, S3 and Postgres database.
+ - `MINA_DAEMON_IMAGE` - mina daemon image to start private mina network (using `minimina`).
+ - `UPTIME_SERVICE_IMAGE` - uptime service image to test against.
+ - `COORDINATOR_BRANCH` - uptime service validation (coordinator) branch/tag to test against.
+ - `STATELESS_VERIFIER_IMAGE` - stateless verifier image to test against.
 
 1. **Test Setup (`invoke test setup`)**: This command prepares the testing environment. It involves setting up the Amazon Keyspaces database, ensuring the S3 bucket is empty, configuring the Postgres database, and initializing the Mina network along with the uptime service backend, coordinator, and stateless_verifier.
 
