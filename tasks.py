@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 from invoke import task
 import boto3
 import os
@@ -5,31 +6,104 @@ import pystache
 import shutil
 
 # Constants
+DOTENV_FILE = "./test/config/.env"
 RUNTIME_DIR = "./runtime"
 COORDINATOR_REPO_URL = "https://github.com/MinaFoundation/uptime-service-validation.git"
 COORDINATOR_RUNTIME_DIR = f"{RUNTIME_DIR}/uptime-service-validation"
 SSL_CERTFILE = f"{COORDINATOR_RUNTIME_DIR}/uptime_service_validation/database/aws_keyspaces/cert/sf-class2-root.crt"
+REQUIRED_ENV_VARS = [
+    "MINA_DAEMON_IMAGE",
+    "UPTIME_SERVICE_IMAGE",
+    "COORDINATOR_BRANCH",
+    "STATELESS_VERIFIER_IMAGE",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_S3_BUCKET",
+    "AWS_KEYSPACE",
+    "AWS_REGION",
+    "CONFIG_NETWORK_NAME",
+    "TEST_ENV",
+    "SURVEY_INTERVAL_MINUTES",
+    "MINI_BATCH_NUMBER",
+    "UPTIME_DAYS_FOR_SCORE",
+    "POSTGRES_HOST",
+    "POSTGRES_PORT",
+    "POSTGRES_DB",
+    "POSTGRES_USER",
+    "POSTGRES_PASSWORD",
+    "AWS_DEFAULT_REGION",
+    "CASSANDRA_HOST",
+    "CASSANDRA_PORT",
+]
 
 
 @task
 def test(ctx, action):
     if action == "setup":
+        load_env(ctx)
+        check_env_vars()
         network(ctx, "setup")
         network(ctx, "create")
         start_postgres(ctx)
         clone_coordinator_repo(ctx)
         prepare_coordinator_postgres(ctx)
     elif action == "start":
+        load_env(ctx)
+        check_env_vars()
         network(ctx, "start")
         start_coordinator(ctx)
     elif action == "stop":
         network(ctx, "stop")
     elif action == "teardown":
+        load_env(ctx)
         network(ctx, "delete")
         stop_postgres(ctx)
         clear_s3_bucket(ctx)
         migrate_keyspaces(ctx, direction="down")
         clear_runtime(ctx)
+
+
+def check_env_vars():
+    missing_vars = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
+    if missing_vars:
+        missing_vars_str = ", ".join(missing_vars)
+        raise ValueError(
+            f"Error: The following required environment variables are not set: {missing_vars_str}"
+        )
+
+
+@task
+def load_env(ctx):
+    decode_dotenv(ctx)
+    load_dotenv(DOTENV_FILE)
+
+
+@task
+def decode_dotenv(ctx):
+    e2e_secret = os.getenv("E2E_SECRET")
+    if not e2e_secret:
+        print("Error: E2E_SECRET environment variable not set.")
+        return
+
+    command = (
+        f"gpg --pinentry-mode loopback --yes --passphrase {e2e_secret} "
+        f"--output {DOTENV_FILE} --decrypt {DOTENV_FILE}.gpg"
+    )
+    ctx.run(command, echo=False, warn=True)
+
+
+@task
+def encode_dotenv(ctx):
+    e2e_secret = os.getenv("E2E_SECRET")
+    if not e2e_secret:
+        print("Error: E2E_SECRET environment variable not set.")
+        return
+
+    command = (
+        f"gpg --pinentry-mode loopback --passphrase {e2e_secret} "
+        f"--symmetric --output {DOTENV_FILE}.gpg {DOTENV_FILE}"
+    )
+    ctx.run(command, echo=True, warn=True)
 
 
 @task
