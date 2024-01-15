@@ -1,4 +1,6 @@
+import subprocess
 from dotenv import load_dotenv
+import psutil
 from invoke import task
 import boto3
 import os
@@ -38,9 +40,14 @@ REQUIRED_ENV_VARS = [
 
 
 @task
+def load_env(ctx):
+    decode_dotenv(ctx)
+    load_dotenv(DOTENV_FILE)
+
+
+@task(pre=[load_env])
 def test(ctx, action):
     if action == "setup":
-        load_env(ctx)
         check_env_vars()
         network(ctx, "setup")
         network(ctx, "create")
@@ -48,14 +55,13 @@ def test(ctx, action):
         clone_coordinator_repo(ctx)
         prepare_coordinator_postgres(ctx)
     elif action == "start":
-        load_env(ctx)
         check_env_vars()
         network(ctx, "start")
         start_coordinator(ctx)
     elif action == "stop":
         network(ctx, "stop")
+        stop_coordinator(ctx)
     elif action == "teardown":
-        load_env(ctx)
         network(ctx, "delete")
         stop_postgres(ctx)
         clear_s3_bucket(ctx)
@@ -70,12 +76,6 @@ def check_env_vars():
         raise ValueError(
             f"Error: The following required environment variables are not set: {missing_vars_str}"
         )
-
-
-@task
-def load_env(ctx):
-    decode_dotenv(ctx)
-    load_dotenv(DOTENV_FILE)
 
 
 @task
@@ -122,10 +122,13 @@ def network(ctx, action):
                 echo=True,
             )
     elif action == "start":
+        print("Starting network...")
         ctx.run(f"minimina network start -n {config_network_name}", echo=True)
     elif action == "stop":
+        print("Stopping network...")
         ctx.run(f"minimina network stop -n {config_network_name}", echo=True)
     elif action == "delete":
+        print("Deleting network...")
         ctx.run(f"minimina network delete -n {config_network_name}", echo=True)
     elif action == "status":
         ctx.run(f"minimina network status -n {config_network_name}", echo=True)
@@ -310,7 +313,7 @@ def prepare_coordinator_postgres(ctx):
         ctx.run("invoke init-database", echo=True)
 
 
-@task
+@task(pre=[load_env])
 def start_coordinator(ctx):
     # Set environment variables
     os.environ["SSL_CERTFILE"] = os.path.abspath(SSL_CERTFILE)
@@ -319,6 +322,48 @@ def start_coordinator(ctx):
     os.environ["WORKER_IMAGE"] = worker_image
     os.environ["WORKER_TAG"] = worker_tag
 
+    log_file = os.path.abspath(os.path.join(RUNTIME_DIR, "coordinator.log"))
+    pid_file = os.path.abspath(os.path.join(RUNTIME_DIR, "coordinator.pid"))
+
     with ctx.cd(COORDINATOR_RUNTIME_DIR):
         ctx.run("poetry install", echo=True)
-        ctx.run("poetry run start", echo=True)
+
+    # Start the coordinator process
+    print(f"Starting coordinator. Logs will be written to {log_file}")
+    command = f"poetry run start > {log_file} 2>&1"
+    proc = subprocess.Popen(command, shell=True, cwd=COORDINATOR_RUNTIME_DIR)
+
+    # Write the PID to the pid_file
+    with open(pid_file, "w") as f:
+        f.write(str(proc.pid))
+
+
+def kill_proc_tree(pid, including_parent=True):
+    try:
+        parent = psutil.Process(pid)
+    except psutil.NoSuchProcess:
+        return  # Process already terminated
+
+    children = parent.children(recursive=True)
+    for child in children:
+        child.kill()
+    if including_parent:
+        parent.kill()
+
+
+@task
+def stop_coordinator(ctx):
+    print("Stopping coordinator...")
+    pid_file = os.path.abspath(os.path.join(RUNTIME_DIR, "coordinator.pid"))
+
+    try:
+        with open(pid_file, "r") as file:
+            pid = int(file.read().strip())
+
+        kill_proc_tree(pid)
+
+        os.remove(pid_file)
+    except OSError as e:
+        print(f"Error stopping coordinator: {e}")
+    except FileNotFoundError:
+        print("PID file not found. Is the coordinator running?")
