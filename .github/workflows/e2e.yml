@@ -1,0 +1,70 @@
+name: E2E Test Mina Delegation Program
+
+on:
+  workflow_dispatch:
+    inputs:
+      mina_daemon_image:
+        description: 'MINA_DAEMON_IMAGE'
+        required: true
+        default: 'gcr.io/o1labs-192920/mina-daemon:2.0.0rampup8-56fa1db-bullseye-berkeley'
+      uptime_service_image:
+        description: 'UPTIME_SERVICE_IMAGE'
+        required: true
+        default: '673156464838.dkr.ecr.us-west-2.amazonaws.com/block-producers-uptime:2.0.0rc3-e7ad680-testworld-2-0'
+      coordinator_branch:
+        description: 'COORDINATOR_BRANCH'
+        required: true
+        default: 'update_setup_validator_process_for_testing'
+      stateless_verifier_image:
+        description: 'STATELESS_VERIFIER_IMAGE'
+        required: true
+        default: '673156464838.dkr.ecr.us-west-2.amazonaws.com/delegation-verify:0.1-8f771a8-devnet'
+
+env:
+  MINA_DAEMON_IMAGE: ${{ github.event.inputs.mina_daemon_image }}
+  UPTIME_SERVICE_IMAGE: ${{ github.event.inputs.uptime_service_image }}
+  COORDINATOR_BRANCH: ${{ github.event.inputs.coordinator_branch }}
+  STATELESS_VERIFIER_IMAGE: ${{ github.event.inputs.stateless_verifier_image }}
+  E2E_SECRET: ${{ secrets.E2E_SECRET }}
+
+jobs:
+  build:
+    runs-on: minafoundation-default-runners
+  
+    steps:
+    - name: 📥 Checkout
+      uses: actions/checkout@v4    
+
+    - name: 🔑 ECR Login
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: 🤌 Get Minimina
+      uses: MinaFoundation/install-minimina-action@v1
+      with:
+        stream: stable
+        
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.10.12
+
+    - name: ⚙️ Install dependencies
+      run: |
+        pip install poetry
+        poetry install
+
+    - name: 🔁 E2E Test
+      run: |
+        poetry run invoke test setup
+        poetry run invoke test start
+        sleep 10
+        poetry run invoke test stop
+        poetry run invoke test teardown
+    
+    - name: 📎 Upload logs
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: logs
+        path: runtime/*.log
