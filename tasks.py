@@ -61,6 +61,7 @@ def test(ctx, action):
     elif action == "stop":
         network(ctx, "stop")
         stop_coordinator(ctx)
+        dump_uptime_service_logs(ctx)
     elif action == "teardown":
         network(ctx, "delete")
         stop_postgres(ctx)
@@ -85,11 +86,12 @@ def decode_dotenv(ctx):
         print("Error: E2E_SECRET environment variable not set.")
         return
 
-    command = (
-        f"gpg --pinentry-mode loopback --yes --passphrase {e2e_secret} "
-        f"--output {DOTENV_FILE} --decrypt {DOTENV_FILE}.gpg"
-    )
-    ctx.run(command, echo=False, warn=True)
+    if not os.path.exists(DOTENV_FILE):
+        command = (
+            f"gpg --pinentry-mode loopback --yes --passphrase {e2e_secret} "
+            f"--output {DOTENV_FILE} --decrypt {DOTENV_FILE}.gpg"
+        )
+        ctx.run(command, echo=False, warn=True)
 
 
 @task
@@ -248,6 +250,15 @@ def setup_topology(ctx):
 def clear_runtime(ctx):
     ctx.run(f"rm -rf {RUNTIME_DIR}", echo=True)
     print(f"Runtime directory '{RUNTIME_DIR}' cleared.")
+
+
+@task(pre=[load_env])
+def dump_uptime_service_logs(ctx):
+    log_file = os.path.abspath(os.path.join(RUNTIME_DIR, "uptime-service.log"))
+    ctx.run(
+        f"minimina node logs -n {os.getenv('CONFIG_NETWORK_NAME')} -i uptime-service-backend -r > {log_file}",
+        echo=True,
+    )
 
 
 @task
