@@ -1,15 +1,19 @@
+import json
 import subprocess
 from dotenv import load_dotenv
 import psutil
 from invoke import task
 import boto3
 import os
+import psycopg2
 import pystache
 import shutil
+import sys
 
 # Constants
 DOTENV_FILE = "./test/config/.env"
 RUNTIME_DIR = "./runtime"
+LOGS_DIR = f"{RUNTIME_DIR}/logs"
 COORDINATOR_REPO_URL = "https://github.com/MinaFoundation/uptime-service-validation.git"
 COORDINATOR_RUNTIME_DIR = f"{RUNTIME_DIR}/uptime-service-validation"
 SSL_CERTFILE = f"{COORDINATOR_RUNTIME_DIR}/uptime_service_validation/database/aws_keyspaces/cert/sf-class2-root.crt"
@@ -24,6 +28,7 @@ REQUIRED_ENV_VARS = [
     "AWS_KEYSPACE",
     "AWS_REGION",
     "CONFIG_NETWORK_NAME",
+    "NETWORK_NAME",
     "TEST_ENV",
     "SURVEY_INTERVAL_MINUTES",
     "MINI_BATCH_NUMBER",
@@ -54,6 +59,7 @@ def test(ctx, action):
         start_postgres(ctx)
         clone_coordinator_repo(ctx)
         prepare_coordinator_postgres(ctx)
+        ctx.run(f"mkdir -p {LOGS_DIR}", echo=True)
     elif action == "start":
         check_env_vars()
         network(ctx, "start")
@@ -62,6 +68,8 @@ def test(ctx, action):
         network(ctx, "stop")
         stop_coordinator(ctx)
         dump_uptime_service_logs(ctx)
+    elif action == "assert-data":
+        assert_data(ctx)
     elif action == "teardown":
         network(ctx, "delete")
         stop_postgres(ctx)
@@ -254,7 +262,7 @@ def clear_runtime(ctx):
 
 @task(pre=[load_env])
 def dump_uptime_service_logs(ctx):
-    log_file = os.path.abspath(os.path.join(RUNTIME_DIR, "uptime-service.log"))
+    log_file = os.path.abspath(os.path.join(LOGS_DIR, "uptime-service.log"))
     ctx.run(
         f"minimina node logs -n {os.getenv('CONFIG_NETWORK_NAME')} -i uptime-service-backend -r > {log_file}",
         echo=True,
@@ -303,9 +311,6 @@ def clone_coordinator_repo(ctx):
     if not coordinator_branch:
         raise ValueError("COORDINATOR_BRANCH environment variable must be set.")
 
-    repo_url = "https://github.com/MinaFoundation/uptime-service-validation.git"
-    destination_dir = "./runtime/uptime-service-validation"
-
     # Clone the specific branch of the repository into the runtime directory
     ctx.run(
         f"git clone --branch {coordinator_branch} {COORDINATOR_REPO_URL} {COORDINATOR_RUNTIME_DIR}",
@@ -333,7 +338,7 @@ def start_coordinator(ctx):
     os.environ["WORKER_IMAGE"] = worker_image
     os.environ["WORKER_TAG"] = worker_tag
 
-    log_file = os.path.abspath(os.path.join(RUNTIME_DIR, "coordinator.log"))
+    log_file = os.path.abspath(os.path.join(LOGS_DIR, "coordinator.log"))
     pid_file = os.path.abspath(os.path.join(RUNTIME_DIR, "coordinator.pid"))
 
     with ctx.cd(COORDINATOR_RUNTIME_DIR):
@@ -378,3 +383,144 @@ def stop_coordinator(ctx):
         print(f"Error stopping coordinator: {e}")
     except FileNotFoundError:
         print("PID file not found. Is the coordinator running?")
+
+
+def get_keyspace_submissions():
+    sys.path.append(COORDINATOR_RUNTIME_DIR)
+    from uptime_service_validation.coordinator.aws_keyspaces_client import (
+        AWSKeyspacesClient,
+    )
+
+    os.environ["SSL_CERTFILE"] = os.path.abspath(SSL_CERTFILE)
+    keyspace = os.getenv("AWS_KEYSPACE")
+    cassandra = AWSKeyspacesClient()
+    cassandra.connect()
+    submissions = cassandra.execute_query(f"SELECT JSON * FROM {keyspace}.submissions")
+    subs_json = [json.loads(row[0]) for row in submissions]
+    cassandra.close()
+    return subs_json
+
+
+def get_s3_blocks_submissions():
+    bucket_name = os.getenv("AWS_S3_BUCKET")
+    network_name = os.getenv("CONFIG_NETWORK_NAME")
+    s3 = boto3.client("s3")
+    blocks = []
+    submissions = []
+
+    # Get the list of block file names and submission contents from the S3 bucket
+    paginator = s3.get_paginator("list_objects_v2")
+    pages = paginator.paginate(Bucket=bucket_name, Prefix=f"{network_name}/")
+
+    for page in pages:
+        for obj in page["Contents"]:
+            key = obj["Key"]
+            if key.endswith(".dat"):
+                blocks.append(key)
+            elif key.endswith(".json"):
+                # Retrieve and read the content of the JSON file
+                json_obj = s3.get_object(Bucket=bucket_name, Key=key)
+                json_content = json_obj["Body"].read().decode("utf-8")
+                submission_content = json.loads(json_content)
+                submissions.append(submission_content)  # Add the parsed JSON content
+
+    return blocks, submissions
+
+
+def get_postgres_data():
+    host = os.getenv("POSTGRES_HOST")
+    port = os.getenv("POSTGRES_PORT")
+    dbname = os.getenv("POSTGRES_DB")
+    user = os.getenv("POSTGRES_USER")
+    password = os.getenv("POSTGRES_PASSWORD")
+
+    conn_str = f"dbname='{dbname}' user='{user}' host='{host}' port='{port}' password='{password}'"
+
+    conn = psycopg2.connect(conn_str)
+    cursor = conn.cursor()
+
+    # Fetching postgres_submitters
+    cursor.execute("SELECT block_producer_key FROM nodes;")
+    postgres_submitters = [row[0] for row in cursor.fetchall()]
+
+    # Fetching postgres_verified_subs
+    cursor.execute("SELECT SUM(files_processed) FROM bot_logs;")
+    postgres_verified_subs = cursor.fetchone()[0]
+
+    # Close the cursor and the connection
+    cursor.close()
+    conn.close()
+
+    return postgres_submitters, postgres_verified_subs
+
+
+@task(pre=[load_env])
+def assert_data(ctx):
+    # Get data from Keyspaces
+    keyspace_subs = get_keyspace_submissions()
+    keyspace_verified_subs = [sub for sub in keyspace_subs if sub["verified"]]
+    keyspace_submitter_keys = set([sub["submitter"] for sub in keyspace_subs])
+    keyspace_block_hashes = set([sub["block_hash"] for sub in keyspace_subs])
+
+    # Get data from S3
+    s3_blocks, s3_submissions = get_s3_blocks_submissions()
+    s3_block_hashes = set(
+        [filename.split("/")[-1].split(".")[0] for filename in s3_blocks]
+    )
+    s3_submitter_keys = set([sub["submitter"] for sub in s3_submissions])
+
+    # Get data from Postgres
+    postgres_submitters, postgres_verified_subs = get_postgres_data()
+
+    # Print data
+    print("SUBMISSIONS DATA")
+    print(f"Total Keyspace submissions: {len(keyspace_subs)}")
+    print(f"Total S3 submissions: {len(s3_submissions)}")
+    print(f"Total Keyspace verified submissions: {len(keyspace_verified_subs)}")
+    print(f"Total Postgres verified submissions: {postgres_verified_subs}")
+    print()
+    print("SUBMITTERS DATA")
+    print(f"Total Keyspace unique submitters: {len(keyspace_submitter_keys)}")
+    print(f"Total S3 submitters: {len(s3_submitter_keys)}")
+    print(f"Total Postgres submitters: {len(postgres_submitters)}")
+    print()
+    print("BLOCKS DATA")
+    print(f"Total Keyspace blocks (hashes): {len(keyspace_block_hashes)}")
+    print(f"Total S3 blocks: {len(s3_blocks)}")
+
+    # Assertions
+    # Check verified submissions has empty raw_block and snark_work fields in Keyspaces
+    for sub in keyspace_verified_subs:
+        assert not sub[
+            "raw_block"
+        ], f"Block field is not empty for verified submission: {sub}"
+        assert not sub[
+            "snark_work"
+        ], f"Snark work field is not empty for verified submission: {sub}"
+
+    # Check verified submissions in Keyspaces equals verified submissions in Postgres
+    assert len(keyspace_verified_subs) == postgres_verified_subs, (
+        f"Mismatch in number of verified submissions between Keyspaces ({len(keyspace_verified_subs)}) "
+        f"and PostgreSQL ({postgres_verified_subs})"
+    )
+    # Check if the number of unique block hashes in Keyspaces equals the number of block files in S3
+    assert len(keyspace_block_hashes) == len(
+        s3_block_hashes
+    ), f"Mismatch in number of unique block hashes between Keyspaces ({len(keyspace_block_hashes)}) and S3 ({len(s3_block_hashes)})"
+
+    # Check block hashes in Keyspaces and S3 are the same
+    assert (
+        keyspace_block_hashes == s3_block_hashes
+    ), f"Block hashes do not match in Keyspaces ({keyspace_block_hashes}) and S3 ({s3_block_hashes})"
+
+    # Check if the number of submissions in Keyspaces equals the number of submissions in S3
+    assert len(keyspace_subs) == len(
+        s3_submissions
+    ), f"Mismatch in number of submissions between Keyspaces ({len(keyspace_subs)}) and S3 ({len(s3_submissions)})"
+
+    postgres_submitter_keys = set(postgres_submitters)
+
+    # Check if all sets contain the same elements
+    assert (
+        keyspace_submitter_keys == s3_submitter_keys == postgres_submitter_keys
+    ), f"Submitter keys do not match across Keyspaces ({keyspace_submitter_keys}), S3 ({s3_submitter_keys}), and PostgreSQL ({postgres_submitter_keys})"
