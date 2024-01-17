@@ -54,17 +54,26 @@ jobs:
         pip install poetry
         poetry install
 
-    - name: 🔁 E2E Test
+    - name: 🔁 E2E Test Start
       run: |
         poetry run invoke test setup
         poetry run invoke test start
-        sleep 10
+    
+    - name: ⏳ Wait
+      run: sleep 1500
+    
+    - name: 🧪 E2E Test Run Checks
+      run: |
         poetry run invoke test stop
-        poetry run invoke test teardown
+        poetry run invoke test assert-data
+    
+    - name: 🔨 E2E Test Teardown
+      if: success()
+      run: poetry run invoke test teardown
     
     - name: 📎 Upload logs
       uses: actions/upload-artifact@v3
       if: always()
       with:
         name: logs
-        path: runtime/*.log
+        path: runtime/logs
