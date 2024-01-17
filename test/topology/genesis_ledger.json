@@ -5,14 +5,14 @@
     "genesis": {
         "k": 20,
         "delta": 0,
-        "slots_per_epoch": 240,
-        "slots_per_sub_window": 2,
+        "slots_per_epoch": 24,
+        "slots_per_sub_window": 1,
         "genesis_state_timestamp": "2023-10-16 12:00:03.092497Z"
     },
     "proof": {
         "level": "full",
         "work_delay": 1,
-        "block_window_duration_ms": 120000,
+        "block_window_duration_ms": 60000,
         "transaction_capacity": {
             "2_to_the": 2
         }
