@@ -56,6 +56,7 @@ jobs:
 
     - name: 🔁 E2E Test Start
       run: |
+        export AWS_ROLE_ARN=''
         poetry run invoke test setup
         poetry run invoke test start
     
@@ -64,6 +65,7 @@ jobs:
     
     - name: 🧪 E2E Test Run Checks
       run: |
+        export AWS_ROLE_ARN=''
         poetry run invoke test stop
         poetry run invoke test assert-data
     
