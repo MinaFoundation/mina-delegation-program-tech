@@ -18,7 +18,7 @@ on:
       stateless_verifier_image:
         description: 'STATELESS_VERIFIER_IMAGE'
         required: true
-        default: '673156464838.dkr.ecr.us-west-2.amazonaws.com/delegation-verify:0.1-8f771a8-devnet'
+        default: '673156464838.dkr.ecr.us-west-2.amazonaws.com/delegation-verify:0.1-ba3c89a-devnet'
 
 env:
   MINA_DAEMON_IMAGE: ${{ github.event.inputs.mina_daemon_image }}
@@ -67,7 +67,7 @@ jobs:
       run: |
         export AWS_ROLE_ARN=''
         poetry run invoke test stop
-        poetry run invoke test assert-data
+        poetry run invoke test assert
     
     - name: 🔨 E2E Test Teardown
       if: success()
