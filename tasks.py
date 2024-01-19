@@ -57,9 +57,9 @@ def test(ctx, action):
     if action == "setup":
         check_env_vars()
         pull_images(ctx)
+        start_postgres(ctx)
         network(ctx, "setup")
         network(ctx, "create")
-        start_postgres(ctx)
         clone_coordinator_repo(ctx)
         prepare_coordinator_postgres(ctx)
         ctx.run(f"mkdir -p {LOGS_DIR}", echo=True)
@@ -336,6 +336,9 @@ def clone_coordinator_repo(ctx):
         echo=True,
     )
 
+    with ctx.cd(COORDINATOR_RUNTIME_DIR):
+        ctx.run("poetry install", echo=True)
+
     print(
         f"Repository cloned into {COORDINATOR_RUNTIME_DIR} on branch '{coordinator_branch}'."
     )
@@ -359,9 +362,6 @@ def start_coordinator(ctx):
 
     log_file = os.path.abspath(os.path.join(LOGS_DIR, "coordinator.log"))
     pid_file = os.path.abspath(os.path.join(RUNTIME_DIR, "coordinator.pid"))
-
-    with ctx.cd(COORDINATOR_RUNTIME_DIR):
-        ctx.run("poetry install", echo=True)
 
     # Start the coordinator process
     print(f"Starting coordinator. Logs will be written to {log_file}")
