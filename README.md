@@ -10,17 +10,26 @@ This top-level repository serves as a central tech hub for the Mina Delegation P
 
 3. **Stateless Verification Tool** ([Pull Request](https://github.com/MinaProtocol/mina/pull/14593)): This tool is essential for maintaining the integrity of submissions. Run by the Coordinator, it performs stateless verification against each submission to ascertain its validity. This verification process is critical in ensuring that only legitimate and accurate data influences the delegation scores.
 
-## End-to-End (E2E) Testing
 
-As the overarching repository, this is also the home for end-to-end tests that validate the entire system's functionality. These tests are crucial for ensuring that each component of the Mina Delegation Program interacts seamlessly and performs as expected.
+## Testing
 
-## Running E2E Tests from GH Workflow
+As the overarching repository, this is also the home for end-to-end/system and load tests that validate the entire system's functionality. These tests are crucial for ensuring that each component of the Mina Delegation Program interacts seamlessly and performs as expected. A robust testing approach helps in identifying potential bottlenecks and ensures that the system can handle real-world use cases efficiently.
 
-## Running E2E Tests Locally
+## E2E Tests
 
-The end-to-end (E2E) testing framework for the Mina Delegation Program is designed to comprehensively evaluate the integration and functionality of the entire system. We utilize Python's Invoke library to manage and run these tests. Below are the steps and commands to execute the E2E tests.
+The end-to-end (E2E) testing framework for the Mina Delegation Program is designed to comprehensively evaluate the integration and functionality of the entire system. We utilize Python's Invoke library to manage and run these tests.
 
-### Prerequisites
+The diagram below illustrates the end-to-end test of the whole system:
+
+![e2e_test](https://github.com/MinaFoundation/mina-delegation-program-tech/assets/42900201/aed5fc69-ba0a-4380-bfae-0c68c5a4616c)
+
+### Running E2E Tests from GH Workflow
+
+### Running E2E Tests Locally
+
+Below are the steps and commands to execute the E2E tests locally.
+
+#### Prerequisites
 
 Before running the E2E tests, ensure you have the following:
 
@@ -29,7 +38,7 @@ Before running the E2E tests, ensure you have the following:
 which is required for `uptime-service-validation` (coordinator).
 3. **Login to ECR**: Make sure to be logged into ECR to be able to get required docker images for `uptime-service-backend` and `stateless_verifier`.
 
-### Test Execution Process
+#### Test Execution Process
 
 Before starting make sure to have following env variables set:
  - `E2E_SECRET` - secret required for decoding `./test/config/.env` file hodling env variables required to set connection to Amazon Keyspaces, S3 and Postgres database.
@@ -44,9 +53,41 @@ Before starting make sure to have following env variables set:
 
 3. **Stop Test (`invoke test stop`)**: Use this command to halt the test. It effectively stops all operations initiated by the 'invoke test start' command. This is useful for temporarily halting the test process for analysis or debugging.
 
-4. **Test Teardown (`invoke test teardown`)**: This final command is used to clean up the testing environment post-testing. It clears the Amazon Keyspaces, S3 buckets, and the Postgres database, ensuring that the environment is reset for subsequent tests.
+4. **Make assertions (`invoke test assert-data`)**: Use this command to cross-check data in Amazon S3 and Keyspaces and Postgres database. The assertions in this step verify data integrity after the test between all those data buckets.  
 
-### Notes on Testing
+5. **Test Teardown (`invoke test teardown`)**: This final command is used to clean up the testing environment post-testing. It clears the Amazon Keyspaces, S3 buckets, and the Postgres database, ensuring that the environment is reset for subsequent tests.
+
+## Load Tests
+
+Load tests are an essential part of our testing strategy, designed to simulate real-world usage and ensure that the system can handle the expected traffic. These tests help us understand how the system behaves under heavy load conditions and identify any performance issues that need to be addressed.
+
+### Tools and Scripts
+
+For our load testing, we utilize [Locust](https://locust.io/), an easy-to-use, scriptable, and scalable performance testing tool. 
+
+All necessary scripts for conducting load tests are located in the `./load_test` directory. This includes:
+
+- **Test Scripts:** Python scripts (`*.py`) used by Locust to define user behavior and simulate traffic.
+- **Resource Monitoring Scripts:** Bash scripts for monitoring system resources like CPU and memory usage during the tests.
+- **Plotting Scripts:** Python scripts for visualizing the resource usage data and test results, aiding in the analysis.
+
+### Running Load Tests
+
+To run the load tests:
+
+1. Navigate to the `./load_test` directory.
+2. Activate the virtual environment with `poetry shell`.
+3. Start the Locust server by running the `locust` command.
+4. Open your web browser and go to `http://localhost:8089` to access the Locust web interface.
+5. Input the desired number of users, spawn rate, and host, then start the test by clicking the 'Start swarming' button.
+
+During the test, you can monitor the system's performance in real-time through the Locust web interface. For more detailed analysis, you can utilize the resource monitoring and plotting scripts to visualize system resource usage over time.
+
+### Reports and Analysis
+
+After each test, it's crucial to analyze the results to identify any performance bottlenecks or system behaviors that need to be addressed. The reports generated from the load tests can be found in the repository's [wiki](https://github.com/MinaFoundation/mina-delegation-program-tech/wiki). These reports provide a detailed analysis of the tests, including metrics like response times, the number of requests per second, and system resource usage.
+
+## Notes on Testing
 
 - **Configuration**: Before running the tests, ensure that all configurations related to the network, databases, and services are correctly set up in accordance with the requirements of the Mina Delegation Program.
 - **Monitoring**: While tests are running, it's advisable to monitor the outputs and logs for any anomalies or errors.
