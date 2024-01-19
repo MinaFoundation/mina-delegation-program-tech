@@ -11,7 +11,8 @@ import shutil
 import sys
 
 # Constants
-DOTENV_FILE = "./test/config/.env"
+E2E_TEST_ROOT_DIR = "./e2e_test"
+DOTENV_FILE = f"{E2E_TEST_ROOT_DIR}/config/.env"
 RUNTIME_DIR = "./runtime"
 LOGS_DIR = f"{RUNTIME_DIR}/logs"
 COORDINATOR_REPO_URL = "https://github.com/MinaFoundation/uptime-service-validation.git"
@@ -202,7 +203,7 @@ def clear_s3_bucket(ctx):
 
 @task
 def setup_topology(ctx):
-    source_dir = "./test/topology"
+    source_dir = f"{E2E_TEST_ROOT_DIR}/topology"
     destination_dir = f"{RUNTIME_DIR}/topology"
 
     # Create the destination directory if it doesn't exist
