@@ -53,7 +53,7 @@ Before starting make sure to have following env variables set:
 
 3. **Stop Test (`invoke test stop`)**: Use this command to halt the test. It effectively stops all operations initiated by the 'invoke test start' command. This is useful for temporarily halting the test process for analysis or debugging.
 
-4. **Make assertions (`invoke test assert-data`)**: Use this command to cross-check data in Amazon S3 and Keyspaces and Postgres database. The assertions in this step verify data integrity after the test between all those data buckets.  
+4. **Make assertions (`invoke test assert`)**: Use this command to cross-check data in Amazon S3 and Keyspaces and Postgres database. The assertions in this step verify data integrity after the test between all those data buckets. The task also checks logs for errors. 
 
 5. **Test Teardown (`invoke test teardown`)**: This final command is used to clean up the testing environment post-testing. It clears the Amazon Keyspaces, S3 buckets, and the Postgres database, ensuring that the environment is reset for subsequent tests.
 

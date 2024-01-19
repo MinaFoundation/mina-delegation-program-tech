@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 from dotenv import load_dotenv
 import psutil
@@ -55,6 +56,7 @@ def load_env(ctx):
 def test(ctx, action):
     if action == "setup":
         check_env_vars()
+        pull_images(ctx)
         network(ctx, "setup")
         network(ctx, "create")
         start_postgres(ctx)
@@ -69,14 +71,30 @@ def test(ctx, action):
         network(ctx, "stop")
         stop_coordinator(ctx)
         dump_uptime_service_logs(ctx)
-    elif action == "assert-data":
+    elif action == "assert":
+        print("Asserting data...")
         assert_data(ctx)
+        print()
+        print("Asserting logs...")
+        assert_logs(ctx)
     elif action == "teardown":
         network(ctx, "delete")
         stop_postgres(ctx)
         clear_s3_bucket(ctx)
         migrate_keyspaces(ctx, direction="down")
         clear_runtime(ctx)
+
+
+@task
+def pull_images(ctx):
+    mina_daemon_image = os.getenv("MINA_DAEMON_IMAGE")
+    uptime_service_image = os.getenv("UPTIME_SERVICE_IMAGE")
+    stateless_verifier_image = os.getenv("STATELESS_VERIFIER_IMAGE")
+
+    ctx.run(f"docker pull {mina_daemon_image}", echo=True)
+    ctx.run(f"docker pull {uptime_service_image}", echo=True)
+    ctx.run(f"docker pull {stateless_verifier_image}", echo=True)
+    ctx.run(f"docker pull postgres", echo=True)
 
 
 def check_env_vars():
@@ -525,3 +543,26 @@ def assert_data(ctx):
     assert (
         keyspace_submitter_keys == s3_submitter_keys == postgres_submitter_keys
     ), f"Submitter keys do not match across Keyspaces ({keyspace_submitter_keys}), S3 ({s3_submitter_keys}), and PostgreSQL ({postgres_submitter_keys})"
+
+
+@task
+def assert_logs(ctx):
+    error_pattern = re.compile(r"ERROR|error|Error|FATAL|Fatal|fatal")
+    error_found = False
+
+    for log_file in os.listdir(LOGS_DIR):
+        if log_file.endswith(".log"):
+            with open(os.path.join(LOGS_DIR, log_file), "r") as file:
+                for line in file:
+                    if error_pattern.search(line):
+                        print(
+                            f"Error or fatal entry found in {log_file}: {line.strip()}"
+                        )
+                        error_found = True
+
+    if error_found:
+        print("Errors or fatal entries were found in log files.")
+        sys.exit(1)
+    else:
+        print("No error or fatal entries found in logs.")
+        sys.exit(0)
