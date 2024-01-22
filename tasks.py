@@ -57,10 +57,10 @@ def test(ctx, action):
     if action == "setup":
         check_env_vars()
         pull_images(ctx)
+        clone_coordinator_repo(ctx)
         start_postgres(ctx)
         network(ctx, "setup")
         network(ctx, "create")
-        clone_coordinator_repo(ctx)
         prepare_coordinator_postgres(ctx)
         ctx.run(f"mkdir -p {LOGS_DIR}", echo=True)
     elif action == "start":
@@ -81,7 +81,7 @@ def test(ctx, action):
         network(ctx, "delete")
         stop_postgres(ctx)
         clear_s3_bucket(ctx)
-        migrate_keyspaces(ctx, direction="down")
+        keyspace_drop_tables(ctx)
         clear_runtime(ctx)
 
 
@@ -143,7 +143,11 @@ def network(ctx, action):
         raise ValueError("CONFIG_NETWORK_NAME environment variable must be set.")
 
     if action == "setup":
-        setup_network(ctx)
+        keyspace_drop_tables(ctx)
+        keyspace_migrate(ctx, direction="up")
+        clear_s3_bucket(ctx)
+        setup_topology(ctx)
+        print("Uptime service setup completed.")
     elif action == "create":
         with ctx.cd(RUNTIME_DIR):
             ctx.run(
@@ -167,18 +171,28 @@ def network(ctx, action):
         )
 
 
+@task(pre=[load_env])
+def keyspace_drop_tables(ctx):
+    sys.path.append(COORDINATOR_RUNTIME_DIR)
+    from uptime_service_validation.coordinator.aws_keyspaces_client import (
+        AWSKeyspacesClient,
+    )
+
+    os.environ["SSL_CERTFILE"] = os.path.abspath(SSL_CERTFILE)
+    keyspace = os.getenv("AWS_KEYSPACE")
+    cassandra = AWSKeyspacesClient()
+    cassandra.connect()
+    tables = cassandra.execute_query(
+        f"SELECT table_name FROM system_schema.tables WHERE keyspace_name = '{keyspace}'"
+    )
+    for table in tables:
+        print(f"Dropping table {keyspace}.{table[0]}")
+        cassandra.execute_query(f"DROP TABLE {keyspace}.{table[0]}")
+    cassandra.close()
+
+
 @task
-def setup_network(ctx):
-    migrate_keyspaces(ctx, direction="down")
-    migrate_keyspaces(ctx, direction="up")
-    clear_s3_bucket(ctx)
-    setup_topology(ctx)
-
-    print("Uptime service setup completed.")
-
-
-@task
-def migrate_keyspaces(ctx, direction):
+def keyspace_migrate(ctx, direction):
     if direction not in ["up", "down"]:
         raise ValueError("Invalid direction. Use 'up' or 'down'.")
 
@@ -404,7 +418,7 @@ def stop_coordinator(ctx):
         print("PID file not found. Is the coordinator running?")
 
 
-def get_keyspace_submissions():
+def keyspace_get_submissions():
     sys.path.append(COORDINATOR_RUNTIME_DIR)
     from uptime_service_validation.coordinator.aws_keyspaces_client import (
         AWSKeyspacesClient,
@@ -420,7 +434,7 @@ def get_keyspace_submissions():
     return subs_json
 
 
-def get_s3_blocks_submissions():
+def s3_get_data():
     bucket_name = os.getenv("AWS_S3_BUCKET")
     network_name = os.getenv("CONFIG_NETWORK_NAME")
     s3 = boto3.client("s3")
@@ -446,7 +460,7 @@ def get_s3_blocks_submissions():
     return blocks, submissions
 
 
-def get_postgres_data():
+def postgres_get_data():
     host = os.getenv("POSTGRES_HOST")
     port = os.getenv("POSTGRES_PORT")
     dbname = os.getenv("POSTGRES_DB")
@@ -476,20 +490,20 @@ def get_postgres_data():
 @task(pre=[load_env])
 def assert_data(ctx):
     # Get data from Keyspaces
-    keyspace_subs = get_keyspace_submissions()
+    keyspace_subs = keyspace_get_submissions()
     keyspace_verified_subs = [sub for sub in keyspace_subs if sub["verified"]]
     keyspace_submitter_keys = set([sub["submitter"] for sub in keyspace_subs])
     keyspace_block_hashes = set([sub["block_hash"] for sub in keyspace_subs])
 
     # Get data from S3
-    s3_blocks, s3_submissions = get_s3_blocks_submissions()
+    s3_blocks, s3_submissions = s3_get_data()
     s3_block_hashes = set(
         [filename.split("/")[-1].split(".")[0] for filename in s3_blocks]
     )
     s3_submitter_keys = set([sub["submitter"] for sub in s3_submissions])
 
     # Get data from Postgres
-    postgres_submitters, postgres_verified_subs = get_postgres_data()
+    postgres_submitters, postgres_verified_subs = postgres_get_data()
 
     # Print data
     print("SUBMISSIONS DATA")
