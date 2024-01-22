@@ -26,6 +26,7 @@ env:
   COORDINATOR_BRANCH: ${{ github.event.inputs.coordinator_branch }}
   STATELESS_VERIFIER_IMAGE: ${{ github.event.inputs.stateless_verifier_image }}
   E2E_SECRET: ${{ secrets.E2E_SECRET }}
+  AWS_ROLE_ARN: ''
 
 jobs:
   build:
@@ -53,19 +54,18 @@ jobs:
       run: |
         pip install poetry
         poetry install
+    
+    - name: 🛠️ E2E Test Setup
+      run: poetry run invoke test setup
 
     - name: 🔁 E2E Test Start
-      run: |
-        export AWS_ROLE_ARN=''
-        poetry run invoke test setup
-        poetry run invoke test start
+      run: poetry run invoke test start
     
     - name: ⏳ Wait
       run: sleep 1500
     
     - name: 🧪 E2E Test Run Checks
       run: |
-        export AWS_ROLE_ARN=''
         poetry run invoke test stop
         poetry run invoke test assert
     
