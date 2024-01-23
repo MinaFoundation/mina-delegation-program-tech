@@ -548,6 +548,7 @@ def wait_for_verifications(ctx):
 
         keyspace_subs = keyspace_get_submissions()
         keyspace_verified_subs = [sub for sub in keyspace_subs if sub["verified"]]
+        _, postgres_verified_subs_num = postgres_get_data()
 
     print(
         f"All submissions have been verified (keyspace / keyspace_verified / postgres_verified): {len(keyspace_subs)} / {len(keyspace_verified_subs)} / {postgres_verified_subs_num}"
