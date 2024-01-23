@@ -61,8 +61,8 @@ jobs:
     - name: 🔁 E2E Test Start
       run: poetry run invoke test start
     
-    - name: ⏳ Wait
-      run: sleep 1500
+    - name: ⏳ Wait for verifications
+      run: poetry run invoke test wait
     
     - name: 🧪 E2E Test Run Checks
       run: |

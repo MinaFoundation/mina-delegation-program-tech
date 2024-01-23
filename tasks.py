@@ -68,6 +68,8 @@ def test(ctx, action):
         check_env_vars()
         network(ctx, "start")
         start_coordinator(ctx)
+    elif action == "wait":
+        wait_for_verifications(ctx)
     elif action == "stop":
         network(ctx, "stop")
         stop_coordinator(ctx)
@@ -486,6 +488,42 @@ def postgres_get_data():
     conn.close()
 
     return postgres_submitters, postgres_verified_subs
+
+
+import time
+from datetime import datetime, timedelta
+
+
+@task(pre=[load_env])
+def wait_for_verifications(ctx):
+    timeout = 60 * 60  # 60 minutes in seconds
+    start_time = datetime.now()
+    keyspace_subs = keyspace_get_submissions()
+    keyspace_verified_subs = [sub for sub in keyspace_subs if sub["verified"]]
+
+    while len(keyspace_verified_subs) != len(keyspace_subs):
+        current_time = datetime.now()
+        elapsed_time = (current_time - start_time).total_seconds()
+
+        # Check if timeout has been reached
+        if elapsed_time > timeout:
+            print(
+                f"Timeout reached: Verified submissions: {len(keyspace_verified_subs)} / {len(keyspace_subs)}"
+            )
+            exit(1)
+
+        ctx.run("sleep 15", echo=True)
+
+        print(
+            f"Waiting for verifications. Verified submissions: {len(keyspace_verified_subs)} / {len(keyspace_subs)}"
+        )
+
+        keyspace_subs = keyspace_get_submissions()
+        keyspace_verified_subs = [sub for sub in keyspace_subs if sub["verified"]]
+
+    print(
+        f"All submissions have been verified. {len(keyspace_verified_subs)} / {len(keyspace_subs)}"
+    )
 
 
 @task(pre=[load_env])
