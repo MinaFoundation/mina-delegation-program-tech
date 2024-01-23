@@ -72,7 +72,7 @@ def test(ctx, action):
         start_coordinator(ctx)
     elif action == "wait":
         keyspace_wait_for_availability(ctx)
-        keyspace_wait_for_verifications(ctx)
+        wait_for_verifications(ctx)
     elif action == "stop":
         network(ctx, "stop")
         stop_coordinator(ctx)
@@ -484,13 +484,13 @@ def postgres_get_data():
 
     # Fetching postgres_verified_subs
     cursor.execute("SELECT SUM(files_processed) FROM bot_logs;")
-    postgres_verified_subs = cursor.fetchone()[0]
+    postgres_verified_subs_num = cursor.fetchone()[0]
 
     # Close the cursor and the connection
     cursor.close()
     conn.close()
 
-    return postgres_submitters, postgres_verified_subs
+    return postgres_submitters, postgres_verified_subs_num
 
 
 @task(pre=[load_env])
@@ -517,13 +517,19 @@ def keyspace_wait_for_availability(ctx):
 
 
 @task(pre=[load_env])
-def keyspace_wait_for_verifications(ctx):
+def wait_for_verifications(ctx):
     timeout = 60 * 60  # 60 minutes in seconds
     start_time = datetime.now()
     keyspace_subs = keyspace_get_submissions()
     keyspace_verified_subs = [sub for sub in keyspace_subs if sub["verified"]]
+    _, postgres_verified_subs_num = postgres_get_data()
 
-    while not (len(keyspace_verified_subs) == len(keyspace_subs) > 0):
+    while not (
+        len(keyspace_verified_subs)
+        == len(keyspace_subs)
+        == postgres_verified_subs_num
+        > 0
+    ):
         current_time = datetime.now()
         elapsed_time = (current_time - start_time).total_seconds()
 
@@ -544,7 +550,7 @@ def keyspace_wait_for_verifications(ctx):
         keyspace_verified_subs = [sub for sub in keyspace_subs if sub["verified"]]
 
     print(
-        f"All submissions have been verified. {len(keyspace_verified_subs)} / {len(keyspace_subs)}"
+        f"All submissions have been verified (keyspace / keyspace_verified / postgres_verified): {len(keyspace_verified_subs)} / {len(keyspace_subs)} / {postgres_verified_subs_num}"
     )
 
 
@@ -564,14 +570,14 @@ def assert_data(ctx):
     s3_submitter_keys = set([sub["submitter"] for sub in s3_submissions])
 
     # Get data from Postgres
-    postgres_submitters, postgres_verified_subs = postgres_get_data()
+    postgres_submitters, postgres_verified_subs_num = postgres_get_data()
 
     # Print data
     print("SUBMISSIONS DATA")
     print(f"Total Keyspace submissions: {len(keyspace_subs)}")
     print(f"Total S3 submissions: {len(s3_submissions)}")
     print(f"Total Keyspace verified submissions: {len(keyspace_verified_subs)}")
-    print(f"Total Postgres verified submissions: {postgres_verified_subs}")
+    print(f"Total Postgres verified submissions: {postgres_verified_subs_num}")
     print()
     print("SUBMITTERS DATA")
     print(f"Total Keyspace unique submitters: {len(keyspace_submitter_keys)}")
@@ -593,9 +599,9 @@ def assert_data(ctx):
         ], f"Snark work field is not empty for verified submission: {sub}"
 
     # Check verified submissions in Keyspaces equals verified submissions in Postgres
-    assert len(keyspace_verified_subs) == postgres_verified_subs, (
+    assert len(keyspace_verified_subs) == postgres_verified_subs_num, (
         f"Mismatch in number of verified submissions between Keyspaces ({len(keyspace_verified_subs)}) "
-        f"and PostgreSQL ({postgres_verified_subs})"
+        f"and PostgreSQL ({postgres_verified_subs_num})"
     )
     # Check if the number of unique block hashes in Keyspaces equals the number of block files in S3
     assert len(keyspace_block_hashes) == len(
