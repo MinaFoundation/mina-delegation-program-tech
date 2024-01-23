@@ -523,7 +523,7 @@ def keyspace_wait_for_verifications(ctx):
     keyspace_subs = keyspace_get_submissions()
     keyspace_verified_subs = [sub for sub in keyspace_subs if sub["verified"]]
 
-    while len(keyspace_verified_subs) != len(keyspace_subs):
+    while not (len(keyspace_verified_subs) == len(keyspace_subs) > 0):
         current_time = datetime.now()
         elapsed_time = (current_time - start_time).total_seconds()
 
@@ -534,7 +534,7 @@ def keyspace_wait_for_verifications(ctx):
             )
             exit(1)
 
-        ctx.run("sleep 15", echo=True)
+        time.sleep(15)
 
         print(
             f"Waiting for verifications. Verified submissions: {len(keyspace_verified_subs)} / {len(keyspace_subs)}"
