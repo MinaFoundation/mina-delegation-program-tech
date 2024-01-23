@@ -56,6 +56,7 @@ def load_env(ctx):
 def test(ctx, action):
     if action == "setup":
         check_env_vars()
+        clear_runtime(ctx)
         pull_images(ctx)
         clone_coordinator_repo(ctx)
         start_postgres(ctx)

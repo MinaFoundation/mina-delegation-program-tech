@@ -18,7 +18,7 @@ on:
       stateless_verifier_image:
         description: 'STATELESS_VERIFIER_IMAGE'
         required: true
-        default: '673156464838.dkr.ecr.us-west-2.amazonaws.com/delegation-verify:0.1-ba3c89a-devnet'
+        default: '673156464838.dkr.ecr.us-west-2.amazonaws.com/delegation-verify:0.1-9a9bc3d-devnet'
 
 env:
   MINA_DAEMON_IMAGE: ${{ github.event.inputs.mina_daemon_image }}
