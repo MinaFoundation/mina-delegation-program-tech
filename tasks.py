@@ -10,6 +10,8 @@ import psycopg2
 import pystache
 import shutil
 import sys
+import time
+from datetime import datetime
 
 # Constants
 E2E_TEST_ROOT_DIR = "./e2e_test"
@@ -69,7 +71,8 @@ def test(ctx, action):
         network(ctx, "start")
         start_coordinator(ctx)
     elif action == "wait":
-        wait_for_verifications(ctx)
+        keyspace_wait_for_availability(ctx)
+        keyspace_wait_for_verifications(ctx)
     elif action == "stop":
         network(ctx, "stop")
         stop_coordinator(ctx)
@@ -490,12 +493,31 @@ def postgres_get_data():
     return postgres_submitters, postgres_verified_subs
 
 
-import time
-from datetime import datetime, timedelta
+@task(pre=[load_env])
+def keyspace_wait_for_availability(ctx):
+    sys.path.append(COORDINATOR_RUNTIME_DIR)
+    from uptime_service_validation.coordinator.aws_keyspaces_client import (
+        AWSKeyspacesClient,
+    )
+
+    os.environ["SSL_CERTFILE"] = os.path.abspath(SSL_CERTFILE)
+    keyspace = os.getenv("AWS_KEYSPACE")
+    cassandra = AWSKeyspacesClient()
+    cassandra.connect()
+    # wait until table submissions is available
+    while True:
+        try:
+            cassandra.execute_query(f"SELECT JSON * FROM {keyspace}.submissions")
+            break
+        except Exception as e:
+            print(f"Waiting for keyspace to be available: {e}")
+            time.sleep(5)
+    print("Keyspace is available.")
+    cassandra.close()
 
 
 @task(pre=[load_env])
-def wait_for_verifications(ctx):
+def keyspace_wait_for_verifications(ctx):
     timeout = 60 * 60  # 60 minutes in seconds
     start_time = datetime.now()
     keyspace_subs = keyspace_get_submissions()
