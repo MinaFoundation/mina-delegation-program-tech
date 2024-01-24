@@ -10,6 +10,14 @@ This top-level repository serves as a central tech hub for the Mina Delegation P
 
 3. **Stateless Verification Tool** ([Pull Request](https://github.com/MinaProtocol/mina/pull/14593)): This tool is essential for maintaining the integrity of submissions. Run by the Coordinator, it performs stateless verification against each submission to ascertain its validity. This verification process is critical in ensuring that only legitimate and accurate data influences the delegation scores.
 
+## Compatibility Matrix
+
+| Component                 | Tag            | Docker Image                                    |
+|---------------------------|----------------|-------------------------------------------------|
+| uptime-service-backend    |         |   |
+| uptime-service-validation |          |  |
+| stateless-verification-tool |       |  |
+
 
 ## Testing
 
