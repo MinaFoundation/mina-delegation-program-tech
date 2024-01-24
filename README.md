@@ -25,6 +25,8 @@ The diagram below illustrates the end-to-end test of the whole system:
 
 ### Running E2E Tests from GH Workflow
 
+Navigate to [E2E Test Mina Delegation Program](https://github.com/MinaFoundation/mina-delegation-program-tech/actions/workflows/e2e.yml) and run the workflow filling all the reqiored parameters.
+
 ### Running E2E Tests Locally
 
 Below are the steps and commands to execute the E2E tests locally.
@@ -51,11 +53,13 @@ Before starting make sure to have following env variables set:
 
 2. **Start Test (`invoke test start`)**: This command launches the test by starting the Mina network and the coordinator along with the stateless_verifier. This step simulates the operational environment of the Mina Delegation Program, allowing for real-time interaction and data processing.
 
-3. **Stop Test (`invoke test stop`)**: Use this command to halt the test. It effectively stops all operations initiated by the 'invoke test start' command. This is useful for temporarily halting the test process for analysis or debugging.
+3. **Wait for verified submissions (`invoke test wait`)**: This command will wait until the system receives submissions and they get validated. When the command stops that means system is in a state when further assertions can be made.
 
-4. **Make assertions (`invoke test assert`)**: Use this command to cross-check data in Amazon S3 and Keyspaces and Postgres database. The assertions in this step verify data integrity after the test between all those data buckets. The task also checks logs for errors. 
+4. **Stop Test (`invoke test stop`)**: Use this command to halt the test. It effectively stops all operations initiated by the 'invoke test start' command. This is useful for temporarily halting the test process for analysis or debugging.
 
-5. **Test Teardown (`invoke test teardown`)**: This final command is used to clean up the testing environment post-testing. It clears the Amazon Keyspaces, S3 buckets, and the Postgres database, ensuring that the environment is reset for subsequent tests.
+5. **Make assertions (`invoke test assert`)**: Use this command to cross-check data in Amazon S3 and Keyspaces and Postgres database. The assertions in this step verify data integrity after the test between all those data buckets. The task also checks logs for errors. 
+
+6. **Test Teardown (`invoke test teardown`)**: This final command is used to clean up the testing environment post-testing. It clears the Amazon Keyspaces, S3 buckets, and the Postgres database, ensuring that the environment is reset for subsequent tests.
 
 ## Load Tests
 
