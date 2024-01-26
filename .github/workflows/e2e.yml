@@ -74,13 +74,13 @@ jobs:
         poetry run invoke test stop
         poetry run invoke test assert
     
-    - name: 🔨 E2E Test Teardown
-      if: success()
-      run: poetry run invoke test teardown
-    
     - name: 📎 Upload logs
       uses: actions/upload-artifact@v3
       if: always()
       with:
         name: logs
         path: runtime/logs
+    
+    - name: 🔨 E2E Test Teardown
+      if: success()
+      run: poetry run invoke test teardown
