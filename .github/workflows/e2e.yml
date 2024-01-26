@@ -14,7 +14,7 @@ on:
       coordinator_branch:
         description: 'COORDINATOR_BRANCH'
         required: true
-        default: 'update_setup_validator_process_for_testing'
+        default: '2.0.0rc1'
       stateless_verifier_image:
         description: 'STATELESS_VERIFIER_IMAGE'
         required: true
