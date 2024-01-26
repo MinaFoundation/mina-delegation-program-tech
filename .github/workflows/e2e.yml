@@ -19,9 +19,14 @@ on:
         description: 'STATELESS_VERIFIER_IMAGE'
         required: true
         default: '673156464838.dkr.ecr.us-west-2.amazonaws.com/delegation-verify:0.1-9a9bc3d-devnet'
+      no_checks:
+          description: 'env NO_CHECKS, set to 1 to run stateless verification with --no-checks'
+          required: true
+          default: '1'
 
 env:
   MINA_DAEMON_IMAGE: ${{ github.event.inputs.mina_daemon_image }}
+  NO_CHECKS: ${{ github.event.inputs.no_checks }}
   UPTIME_SERVICE_IMAGE: ${{ github.event.inputs.uptime_service_image }}
   COORDINATOR_BRANCH: ${{ github.event.inputs.coordinator_branch }}
   STATELESS_VERIFIER_IMAGE: ${{ github.event.inputs.stateless_verifier_image }}
