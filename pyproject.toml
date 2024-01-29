@@ -16,6 +16,7 @@ psutil = "^5.9.7"
 locust = "^2.20.1"
 pandas = "^2.1.4"
 matplotlib = "^3.8.2"
+flask = "^3.0.1"
 
 [build-system]
 requires = ["poetry-core"]
