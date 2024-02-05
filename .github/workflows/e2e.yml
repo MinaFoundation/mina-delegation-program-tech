@@ -6,7 +6,7 @@ on:
       mina_daemon_image:
         description: 'MINA_DAEMON_IMAGE'
         required: true
-        default: 'gcr.io/o1labs-192920/mina-daemon:2.0.0rampup8-56fa1db-bullseye-berkeley'
+        default: 'gcr.io/o1labs-192920/mina-daemon:2.0.0berkeley-rc1-1551e2f-bullseye-berkeley'
       uptime_service_image:
         description: 'UPTIME_SERVICE_IMAGE'
         required: true
