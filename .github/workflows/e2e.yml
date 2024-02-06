@@ -69,11 +69,15 @@ jobs:
     - name: ⏳ Wait for verifications
       run: poetry run invoke test wait
     
-    - name: 🧪 E2E Test Run Checks
+    - name: 🛑 E2E Test Stop & Dump Logs
+      if: always()
       run: |
         poetry run invoke test stop
-        poetry run invoke test assert
+        poetry run invoke test dump-logs
     
+    - name: 🧪 E2E Test Run Checks
+      run: poetry run invoke test assert
+
     - name: 📎 Upload logs
       uses: actions/upload-artifact@v3
       if: always()

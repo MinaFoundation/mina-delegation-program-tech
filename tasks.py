@@ -76,7 +76,8 @@ def test(ctx, action):
     elif action == "stop":
         network(ctx, "stop")
         stop_coordinator(ctx)
-        dump_uptime_service_logs(ctx)
+    elif action == "dump-logs":
+        dump_logs(ctx)
     elif action == "assert":
         print("Asserting data...")
         assert_data(ctx)
@@ -300,12 +301,22 @@ def clear_runtime(ctx):
 
 
 @task(pre=[load_env])
-def dump_uptime_service_logs(ctx):
-    log_file = os.path.abspath(os.path.join(LOGS_DIR, "uptime-service.log"))
-    ctx.run(
-        f"minimina node logs -n {os.getenv('CONFIG_NETWORK_NAME')} -i uptime-service-backend -r > {log_file}",
-        echo=True,
-    )
+def dump_logs(ctx):
+    services = [
+        "uptime-service-backend",
+        "node-a",
+        "node-b",
+        "node-c",
+        "snark-node",
+        "default-seed",
+    ]
+    for service in services:
+        log_file = os.path.abspath(os.path.join(LOGS_DIR, f"{service}.log"))
+        ctx.run(
+            f"minimina node logs -n {os.getenv('CONFIG_NETWORK_NAME')} -i {service} -r > {log_file}",
+            echo=True,
+        )
+        print(f"Logs for {service} have been written to {log_file}")
 
 
 @task
@@ -319,7 +330,7 @@ def start_postgres(ctx):
 
     # Run the PostgreSQL Docker container
     ctx.run(
-        f"docker run --name postgres-container "
+        f"docker run --name postgres-e2e "
         f"-e POSTGRES_DB={postgres_db} "
         f"-e POSTGRES_USER={postgres_user} "
         f"-e POSTGRES_PASSWORD={postgres_password} "
@@ -337,9 +348,9 @@ def start_postgres(ctx):
 @task
 def stop_postgres(ctx):
     # Stop the PostgreSQL Docker container
-    ctx.run("docker stop postgres-container", echo=True)
+    ctx.run("docker stop postgres-e2e", echo=True)
     # Remove the PostgreSQL Docker container
-    ctx.run("docker rm postgres-container", echo=True)
+    ctx.run("docker rm postgres-e2e", echo=True)
 
     print("PostgreSQL container stopped and removed.")
 
@@ -633,7 +644,7 @@ def assert_logs(ctx):
     error_found = False
 
     for log_file in os.listdir(LOGS_DIR):
-        if log_file.endswith(".log"):
+        if log_file == "coordinator.log" or log_file == "uptime-service-backend.log":
             with open(os.path.join(LOGS_DIR, log_file), "r") as file:
                 for line in file:
                     if error_pattern.search(line):
