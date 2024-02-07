@@ -10,7 +10,7 @@ on:
       uptime_service_image:
         description: 'UPTIME_SERVICE_IMAGE'
         required: true
-        default: '673156464838.dkr.ecr.us-west-2.amazonaws.com/block-producers-uptime:staging-94c53c9-testworld2'
+        default: '673156464838.dkr.ecr.us-west-2.amazonaws.com/uptime-service-backend:2.0.0rc5-cb6524c'
       coordinator_branch:
         description: 'COORDINATOR_BRANCH'
         required: true
