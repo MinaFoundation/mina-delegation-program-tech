@@ -4,7 +4,12 @@ import random
 from locust import HttpUser, TaskSet, task, between
 
 # Get the test name from an environment variable
-TEST_NAME = os.environ.get("TEST_NAME", "default")
+TEST_NAME = os.environ.get("TEST_NAME", "rc1")
+print("-----------------------------------")
+print(f"Test name: {TEST_NAME}")
+print(f"Payload directory: ./payload/{TEST_NAME}")
+print("To change the test name, set the TEST_NAME environment variable.")
+print("-----------------------------------")
 
 # Construct the payload directory path based on the test name
 PAYLOAD_DIR = f"./payload/{TEST_NAME}"
