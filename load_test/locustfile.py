@@ -14,7 +14,7 @@ print("-----------------------------------")
 # Construct the payload directory path based on the test name
 PAYLOAD_DIR = f"./payload/{TEST_NAME}"
 
-TARGET_EP = "http://localhost:8080/v1/submit"
+TARGET_EP = "/v1/submit"
 
 
 class UserBehavior(TaskSet):
