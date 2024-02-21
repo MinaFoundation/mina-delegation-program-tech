@@ -18,7 +18,7 @@ on:
       stateless_verifier_image:
         description: 'STATELESS_VERIFIER_IMAGE'
         required: true
-        default: '673156464838.dkr.ecr.us-west-2.amazonaws.com/delegation-verify:0.1-fd74436-devnet'
+        default: '673156464838.dkr.ecr.us-west-2.amazonaws.com/delegation-verify:0.1-426650a-devnet'
       no_checks:
           description: 'env NO_CHECKS, set to 1 to run stateless verification with --no-checks'
           required: true
