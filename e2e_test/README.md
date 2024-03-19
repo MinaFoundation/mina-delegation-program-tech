@@ -26,7 +26,8 @@ Both these apps are handled automatically by the provided `gen_blocks.sh`
 script (they must be compiled manually, though). For the script to work
 the following env variables should be set:
 
-* `MINA_DIR` - the path to the mina repository
+* `DFELEGATION_VERIFY` - the path to the stateless verifier binary
+* `DUMP_BLOCKS` - the path to the dump blocks tool.
 * `BLOCK_DIR` - the path to the directory where the generated blocks will be output
 * `SUBMISSION` - the path to the dummy submission file
 
