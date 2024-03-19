@@ -19,11 +19,14 @@ class Node:
         containing a BP pub key and a peer_id."""
         now = datetime.now(timezone.utc)
         return {
-            "created_at": now.strftime('%Y-%m-%dT%H:%M:%SZ'),
-            "peer_id": self.peer_id,
-            "snark_work": SNARK_WORK, # this is a dummy proof.
             "submitter": self.public_key,
-            "block_hash": block
+            "signature": "7mX1kSj74K1FVnNrRhDMabMshRA2iNadA5Q5ikqh95FAE3Hi4o6fQUQzgHmuacLk7ZZh9evh1FwAzMe1JwCycr5PZQ3RoXZf",
+            "data": {
+                "block": block,
+                "created_at": now.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                "peer_id": self.peer_id,
+                "snark_work": None
+            }
         }
 
 NODES = list(Node(peer_id, bp) for bp, peer_id in zip(BP_KEYS, LIBP2P_PEER_IDS))
