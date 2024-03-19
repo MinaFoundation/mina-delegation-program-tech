@@ -40,6 +40,10 @@ if [[ -n "$SUBMISSION" ]]; then
 else
   SUBMISSION="$(realpath "$(dirname "$0")/dummy-submission.json")"
 fi
+if ! [[ -f "$SUBMISSION" ]]; then
+  echo "Submission file not found!" > /dev/stderr
+  exit 1
+fi
 
 if [[ -z "$1" ]]; then
   block_count=20
