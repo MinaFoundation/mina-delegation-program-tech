@@ -9,16 +9,16 @@ against these blocks and submissions and see that:
   - blocks form a smooth, uninterrupted chain and there are no forks."""
 
 import argparse
-import base64
 from datetime import datetime, timedelta, timezone
 import itertools
 import json
-import os
-import requests
 import sys
 import time
 
-from data import BLOCKS, BP_KEYS, LIBP2P_PEER_IDS, SNARK_WORK
+import requests
+
+from data import BP_KEYS, LIBP2P_PEER_IDS
+from local_block_reader import LocalBlockReader
 from network import NODES
 
 
@@ -31,19 +31,16 @@ class Scheduler:
     block from the provided list. When that list is exhausted,
     iteration stops."""
 
-    def __init__(self, blocks, nodes, block_dir,
+    def __init__(self, nodes, block_reader,
                  block_time=timedelta(minutes=3),
                  submission_time=timedelta(minutes=1)):
         "Initialize the scheduler."
-        self.block_dir = block_dir
-        self.blocks = iter(blocks)
+        self.block_reader = block_reader
         self.nodes = itertools.cycle(nodes)
-        self.current_block = next(self.blocks)
         self.block_time = block_time
         self.submission_time = submission_time
         self.next_block = None
         self.next_submission = None
-        self.block_data = None
 
     def __iter__(self):
         "Initialize an iteration."
@@ -51,6 +48,9 @@ class Scheduler:
         now.replace(second=0, microsecond=0)
         self.next_block = now + self.block_time
         self.next_submission = now + self.submission_time
+        # initialize iteration on block reader and select the first block
+        iter(self.block_reader)
+        next(self.block_reader)
         return self
 
     def __next__(self):
@@ -61,35 +61,43 @@ class Scheduler:
             # at some point this will raise StopIteration
             # which we allow to propagate to terminate the
             # scheduling
-            self.current_block = next(self.blocks)
-            self.block_data = None
+            next(self.block_reader)
 
         if now < self.next_submission:
             time.sleep((self.next_submission - now).total_seconds())
 
-        self.next_submission += timedelta(seconds=60)
+        self.next_submission += self.submission_time
         return next(self.nodes)
 
     def read_block(self):
-        "Read block data from disk and cache."
-        if self.block_data is None:
-            filename = f"{self.current_block}.dat"
-            with open(os.path.join(self.block_dir, filename), "rb") as f:
-                block = f.read()
-                self.block_data = base64.b64encode(block).decode("ascii")
-        return self.block_data
+        "Use the block reader to extract more block data."
+        return self.block_reader.read_block()
+
+    @property
+    def current_block(self):
+        "Return the state hash of the current block."
+        return self.block_reader.current_state_hash
 
 
 def parse_args():
     "Parse command line options."
     p = argparse.ArgumentParser()
     p.add_argument("--block-dir", required=True, help="Directory with block files.")
+    p.add_argument("--block-time", default=180, type=int, help="Block time in seconds.")
+    p.add_argument("--submission-time", default=60, type=int,
+                   help="Interval between subsequent submissions.")
     p.add_argument("uptime_service_url")
     return p.parse_args()
 
 def main(args):
     """Generate submissions for the uptime service."""
-    scheduler = Scheduler(BLOCKS, NODES, args.block_dir)
+    block_reader = LocalBlockReader(args.block_dir)
+    scheduler = Scheduler(
+        NODES,
+        block_reader,
+        block_time=timedelta(seconds=args.block_time),
+        submission_time=timedelta(seconds=args.submission_time)
+    )
     for node in scheduler:
         sub = node.submission(scheduler.read_block())
         now = datetime.now(timezone.utc)

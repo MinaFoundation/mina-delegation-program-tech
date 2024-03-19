@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from data import BP_KEYS, LIBP2P_PEER_IDS, SNARK_WORK
+from data import BP_KEYS, LIBP2P_PEER_IDS
 
 
 @dataclass
