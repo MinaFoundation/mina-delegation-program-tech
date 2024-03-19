@@ -19,6 +19,7 @@ import requests
 
 from data import BP_KEYS, LIBP2P_PEER_IDS
 from local_block_reader import LocalBlockReader
+from s3_block_reader import S3BlockReader
 from network import NODES
 
 
@@ -82,7 +83,9 @@ class Scheduler:
 def parse_args():
     "Parse command line options."
     p = argparse.ArgumentParser()
-    p.add_argument("--block-dir", required=True, help="Directory with block files.")
+    p.add_argument("--block-dir", help="Directory with block files.")
+    p.add_argument("--block-s3-bucket", help="S3 bucket where blocks are stored.")
+    p.add_argument("--block-s3-dir", help="S3 directory where blocks are stored.")
     p.add_argument("--block-time", default=180, type=int, help="Block time in seconds.")
     p.add_argument("--submission-time", default=60, type=int,
                    help="Interval between subsequent submissions.")
@@ -91,7 +94,13 @@ def parse_args():
 
 def main(args):
     """Generate submissions for the uptime service."""
-    block_reader = LocalBlockReader(args.block_dir)
+    if args.block_dir is not None:
+        block_reader = LocalBlockReader(args.block_dir)
+    elif args.block_s3_dir is not None and args.block_s3_bucket is not None:
+        block_reader = S3BlockReader(args.block_s3_bucket, args.block_s3_dir)
+    else:
+        raise RuntimeError("No block storage provided!")
+
     scheduler = Scheduler(
         NODES,
         block_reader,

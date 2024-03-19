@@ -3,27 +3,22 @@
 import base64
 import os
 
+from block_reader import BlockReader
 
-class LocalBlockReader:
+
+class LocalBlockReader(BlockReader):
     "Read blocks from local file system."
 
     def __init__(self, block_dir):
         "Initialize."
+        super().__init__()
         self.block_dir = block_dir
-        self.blocks = None
-        self.current_state_hash = None
-        self.current_block_data = None
 
-    def __iter__(self):
+    def read_block_list(self):
+        "Read the list of block state hashes to process."
         block_list = os.path.join(self.block_dir, "block_list.txt")
         with open(block_list, "r", encoding="utf-8") as fp:
-            self.blocks = (l.strip() for l in fp.readlines())
-        return self
-
-    def __next__(self):
-        self.current_state_hash = next(self.blocks)
-        self.current_block_data = None
-        return self.current_state_hash
+            return (l.strip() for l in fp.readlines())
 
     def read_block(self):
         """Read the current block's data from disk and cache for
