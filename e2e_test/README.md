@@ -1,22 +1,23 @@
 Uptime service end-to-end test
 ==============================
 
-Step 1. Block generation
-------------------------
-
 A blockchain is a hairy process, involving a lot of peer-to-peer
-networking, distributing blocks and transactions, selecting
-block producers and so forth. Any process involving a real
-blockchain is inherently irreproducible. On top of that, Mina
-nodes take a considerable time to start and synchronise. All this
-would slow down the test.
+networking, distributing blocks and transactions, selecting block
+producers, resolving forks and so forth. Any process involving a real
+blockchain is inherently irreproducible. On top of that, Mina nodes
+take a considerable time to start and synchronise. All this would slow
+down the test.
 
 In order to avoid these issues, we mock the network with a Python
 script which will send submissions on behalf of some imaginary block
 producers, containing blocks of some imaginary, dummy blockchain.
 Because we don't want to depend on a node to generate these blocks,
-we need to generate them beforehand. For this step we require
-Mina repository. In particular we will use:
+we need to generate them beforehand. 
+
+Step 1. Block generation
+------------------------
+
+For this step we require Mina repository. In particular we will use:
 
 * `dump_blocks` app to generate dummy blocks
 * `delegation_verify` app to extract state hashes from generated
@@ -34,6 +35,11 @@ the following env variables should be set:
 The script can be used as follows:
 
     $ BLOCK_DIR=/home/user/blocks ./gen_block.sh <number of blocks to generate>
+    
+If source code for Mina is present in the file system, `DELEGATION_VERIFY`
+and `DUMP_BLOCKS` paths can be replaced with `MINA_DIR` containing a path
+to the root of the source code repository. Required apps still have to be
+compiled by hand.
     
 Step 2. Upload
 --------------
@@ -56,11 +62,12 @@ Step 3. Running the mock
 ------------------------
 
 This step requires an uptime-service already running. It should be configured
-such that to does not verify signatures on submissions. We want to test the
+such that it does not verify signatures on submissions. We want to test the
 logic of the uptime service, not signature verification. The mock is run
 as follows:
 
-    $ python generate_submissions.py --block-s3-dir <folder name> <uptime service URL>
+    $ python generate_submissions.py --block-s3-bucket <bucket> \
+        --block-s3-dir <folder name> <uptime service URL>
     
 The mock contains a list of 15 hard-coded public keys, which serve as
 block producers' addresses. It loads the list of blocks at the given
@@ -81,6 +88,7 @@ These parameters can be tweaked using command line parameters:
 * `--submission-time` followed by an integer defines the interval
   in seconds after which the system proceeds with the next submission.
   
-The mock can also be run without downloading blocks from s3. In this case
-`--block-s3-dir` parameter should be replaces with `--block-dir` pointing
-to a local directory containing blocks as described above.
+The mock can also be run without downloading blocks from s3. In this
+case `--block-s3-bucket` and `--block-s3-dir` parameters should be
+replaces with `--block-dir` pointing to a local directory containing
+blocks as described above.
