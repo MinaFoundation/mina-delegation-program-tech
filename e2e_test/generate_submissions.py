@@ -34,6 +34,7 @@ class Scheduler:
     def __init__(self, blocks, nodes, block_dir,
                  block_time=timedelta(minutes=3),
                  submission_time=timedelta(minutes=1)):
+        "Initialize the scheduler."
         self.block_dir = block_dir
         self.blocks = iter(blocks)
         self.nodes = itertools.cycle(nodes)
@@ -45,6 +46,7 @@ class Scheduler:
         self.block_data = None
 
     def __iter__(self):
+        "Initialize an iteration."
         now = datetime.now(timezone.utc)
         now.replace(second=0, microsecond=0)
         self.next_block = now + self.block_time
@@ -52,6 +54,7 @@ class Scheduler:
         return self
 
     def __next__(self):
+        "Return the next scheduled submission."
         now = datetime.now(timezone.utc)
         if now >= self.next_block:
             self.next_block += self.block_time
@@ -68,6 +71,7 @@ class Scheduler:
         return next(self.nodes)
 
     def read_block(self):
+        "Read block data from disk and cache."
         if self.block_data is None:
             filename = f"{self.current_block}.dat"
             with open(os.path.join(self.block_dir, filename), "rb") as f:
