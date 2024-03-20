@@ -12,35 +12,13 @@ In order to avoid these issues, we mock the network with a Python
 script which will send submissions on behalf of some imaginary block
 producers, containing blocks of some imaginary, dummy blockchain.
 Because we don't want to depend on a node to generate these blocks,
-we need to generate them beforehand. 
+we need to generate them beforehand.
 
 Step 1. Block generation
 ------------------------
 
-For this step we require Mina repository. In particular we will use:
+Use the script in `dummy_blockchain` directory to generate a dummy blockchain.
 
-* `dump_blocks` app to generate dummy blocks
-* `delegation_verify` app to extract state hashes from generated
-  blocks
-
-Both these apps are handled automatically by the provided `gen_blocks.sh`
-script (they must be compiled manually, though). For the script to work
-the following env variables should be set:
-
-* `DFELEGATION_VERIFY` - the path to the stateless verifier binary
-* `DUMP_BLOCKS` - the path to the dump blocks tool.
-* `BLOCK_DIR` - the path to the directory where the generated blocks will be output
-* `SUBMISSION` - the path to the dummy submission file
-
-The script can be used as follows:
-
-    $ BLOCK_DIR=/home/user/blocks ./gen_block.sh <number of blocks to generate>
-    
-If source code for Mina is present in the file system, `DELEGATION_VERIFY`
-and `DUMP_BLOCKS` paths can be replaced with `MINA_DIR` containing a path
-to the root of the source code repository. Required apps still have to be
-compiled by hand.
-    
 Step 2. Upload
 --------------
 
@@ -61,34 +39,4 @@ accordingly.
 Step 3. Running the mock
 ------------------------
 
-This step requires an uptime-service already running. It should be configured
-such that it does not verify signatures on submissions. We want to test the
-logic of the uptime service, not signature verification. The mock is run
-as follows:
-
-    $ python generate_submissions.py --block-s3-bucket <bucket> \
-        --block-s3-dir <folder name> <uptime service URL>
-    
-The mock contains a list of 15 hard-coded public keys, which serve as
-block producers' addresses. It loads the list of blocks at the given
-address and forms the chain of state hashes. It also rotates the list
-of block producers so that it never ends. It sets the block pointer to
-the first block on the list.
-
-Then every minute it picks up the next node and sends a submission
-with the block currently pointed to by the block pointer. Every 3 minutes
-it also moves the block pointer to the next block. This way every block
-producer appears to make a submission every 15 minutes and each block
-gets submitted by 3 distinct block producers.
-
-These parameters can be tweaked using command line parameters:
-
-* `--block-time` followed by an integer defines the interval in seconds
-  after which the system proceeds to the next block.
-* `--submission-time` followed by an integer defines the interval
-  in seconds after which the system proceeds with the next submission.
-  
-The mock can also be run without downloading blocks from s3. In this
-case `--block-s3-bucket` and `--block-s3-dir` parameters should be
-replaces with `--block-dir` pointing to a local directory containing
-blocks as described above.
+Use the `generate_submissions.py` script in `blockchain_mock` directory.
