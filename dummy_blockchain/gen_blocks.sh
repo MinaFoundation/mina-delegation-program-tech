@@ -18,7 +18,7 @@
 if [[ -n "$MINA_DIR" ]]; then
   MINA_DIR="$(realpath "$MINA_DIR")" 
 else
-  MINA_DIR="$(dirname "$0")/../mina"
+  MINA_DIR="$HOME/work/mina"
 fi
 if [[ -n "$DELEGATION_VERIFY" ]]; then
   DELEGATION_VERIFY="$(realpath "$DELEGATION_VERIFY")"
