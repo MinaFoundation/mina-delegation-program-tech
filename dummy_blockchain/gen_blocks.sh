@@ -51,6 +51,7 @@ else
   block_count="$1"
 fi
 dummy_hash="dummy"
+current_block=
 
 # If an argument is provided, it's assumed to be the state hash of
 # the parent block. Otherwise, the parent state hash is generated at
@@ -71,14 +72,10 @@ function get_state_hash() {
 
 mkdir -p "$BLOCK_DIR"
 cd $MINA_DIR
-generate_block_after  # first block in the chain
-
-current_block="$(get_state_hash)"
-mv -v "$BLOCK_DIR/$dummy_hash.dat" "$BLOCK_DIR/$current_block.dat"
-echo "$current_block" > "$BLOCK_DIR/block_list.txt"
-block_count="$((block_count - 1))"
 
 while [[ "$block_count" -gt 0 ]]; do
+  # NOTE: in the first pass $current_block is empty, resulting in no
+  # parent being passed to dump_blocks.
   generate_block_after "$current_block"
   current_block="$(get_state_hash)"
   echo "$current_block" >> "$BLOCK_DIR/block_list.txt"
