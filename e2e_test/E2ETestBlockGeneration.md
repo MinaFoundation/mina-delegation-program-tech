@@ -1,4 +1,4 @@
-Uptime service end-to-end test
+Uptime service end-to-end test with block generation
 ==============================
 
 A blockchain is a hairy process, involving a lot of peer-to-peer
