@@ -8,7 +8,9 @@ This top-level repository serves as a central tech hub for the Mina Delegation P
 
 2. **Uptime Service Validation (Coordinator)** ([Repository](https://github.com/MinaFoundation/uptime-service-validation)): Often referred to as the Coordinator, this component analyzes the submissions gathered by the Uptime Service Backend. Its primary function is to construct a delegation score based on the analyzed data.
 
-3. **Stateless Verification Tool** ([Pull Request](https://github.com/MinaProtocol/mina/pull/14593)): This tool is essential for maintaining the integrity of submissions. Run by the Coordinator, it performs stateless verification against each submission to ascertain its validity. This verification process is critical in ensuring that only legitimate and accurate data influences the delegation scores.
+3. **Stateless Verification Tool** ([Repository](https://github.com/MinaProtocol/mina/tree/develop/src/app/delegation_verify)): This tool is essential for maintaining the integrity of submissions. It performs stateless verification against each submission to ascertain its validity. This verification process is critical in ensuring that only legitimate and accurate data influences the delegation scores.
+
+4. **Submission Updater** ([Repository](https://github.com/MinaFoundation/submission-updater)): This is a wrapper over the [Stateless verifier tool](https://github.com/MinaProtocol/mina/tree/develop/src/app/delegation_verify) that is responsible for communication with Cassandra database. It will select a range of submissions from Cassandra, feed `stateless_verifier_tool` with it, collect results and update submissions with gathered data. Typically `submission_updater` and `stateless_verifer_tool` are packaged into single docker image and work together as one component of the system.
 
 ## Testing
 
@@ -64,33 +66,7 @@ Before starting make sure to have following env variables set:
 
 ## Load Tests
 
-Load tests are an essential part of our testing strategy, designed to simulate real-world usage and ensure that the system can handle the expected traffic. These tests help us understand how the system behaves under heavy load conditions and identify any performance issues that need to be addressed.
-
-### Tools and Scripts
-
-For our load testing, we utilize [Locust](https://locust.io/), an easy-to-use, scriptable, and scalable performance testing tool. 
-
-All necessary scripts for conducting load tests are located in the `./load_test` directory. This includes:
-
-- **Test Scripts:** Python scripts (`*.py`) used by Locust to define user behavior and simulate traffic.
-- **Resource Monitoring Scripts:** Bash scripts for monitoring system resources like CPU and memory usage during the tests.
-- **Plotting Scripts:** Python scripts for visualizing the resource usage data and test results, aiding in the analysis.
-
-### Running Load Tests
-
-To run the load tests:
-
-1. Navigate to the `./load_test` directory.
-2. Activate the virtual environment with `poetry shell`.
-3. Start the Locust server by running the `locust` command.
-4. Open your web browser and go to `http://localhost:8089` to access the Locust web interface.
-5. Input the desired number of users, spawn rate, and host, then start the test by clicking the 'Start swarming' button.
-
-During the test, you can monitor the system's performance in real-time through the Locust web interface. For more detailed analysis, you can utilize the resource monitoring and plotting scripts to visualize system resource usage over time.
-
-### Reports and Analysis
-
-After each test, it's crucial to analyze the results to identify any performance bottlenecks or system behaviors that need to be addressed. The reports generated from the load tests can be found in the repository's [wiki](https://github.com/MinaFoundation/mina-delegation-program-tech/wiki). These reports provide a detailed analysis of the tests, including metrics like response times, the number of requests per second, and system resource usage.
+See [Load Tests](https://github.com/MinaFoundation/mina-delegation-program-tech/tree/main/load_test).
 
 ## Notes on Testing
 
