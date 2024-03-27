@@ -13,62 +13,22 @@ DROP TABLE points_summary;
 DELETE FROM bot_logs
 WHERE batch_start_epoch <= trunc(extract(epoch from ('2023-12-01 00:00:00+00' :: timestamp)));
 
--- We need this column to somehow distinguish between identical
--- rows and drop some so that only a single copy of each remains.
--- Thankfully, all records with the same id are identical, so
--- we can just look at id when removing duplicates.
--- Finally we put PRIMARY KEY constraint on id column so that this
--- situation does not arise again.
-ALTER TABLE bot_logs
-ADD COLUMN temp_id SERIAL PRIMARY KEY;
-
-DELETE FROM bot_logs AS bl
-USING bot_logs AS helper
-WHERE bl.id = helper.id
-AND bl.temp_id > helper.temp_id;
-
-ALTER TABLE bot_logs
-DROP COLUMN temp_id;
-
 ALTER TABLE bot_logs
 DROP COLUMN status;
 
 ALTER TABLE bot_logs
 DROP COLUMN number_of_threads;
 
-ALTER TABLE bot_logs
-ADD PRIMARY KEY (id);
-
 --nodes:
 
 DELETE FROM nodes
 WHERE updated_at IS NULL;
-
--- We need this column to somehow distinguish between identical
--- rows and drop some so that only a single copy of each remains.
--- Thankfully, all records with the same id are identical, so
--- we can just look at id when removing duplicates.
--- Finally we put PRIMARY KEY constraint on id column so that this
--- situation does not arise again.
-ALTER TABLE nodes
-ADD COLUMN temp_id SERIAL PRIMARY KEY;
-
-DELETE FROM nodes AS n
-USING nodes AS helper
-WHERE n.id = helper.id
-AND n.temp_id > helper.temp_id;
-
-ALTER TABLE nodes
-DROP COLUMN temp_id;
 
 ALTER TABLE nodes
 ALTER COLUMN updated_at SET NOT NULL;
 
 ALTER TABLE nodes
 ALTER COLUMN score_percent TYPE NUMERIC(10, 2);
-
-ALTER TABLE nodes
-ADD PRIMARY KEY (id);
 
 -- points:
 
@@ -100,23 +60,6 @@ WHERE bot_log_id IS NULL
 OR statehash_id IS NULL
 OR bot_log_id NOT IN (SELECT id FROM bot_logs);
 
--- We need this column to somehow distinguish between identical
--- rows and drop some so that only a single copy of each remains.
--- Thankfully, all records with the same id are identical, so
--- we can just look at id when removing duplicates.
--- Finally we put PRIMARY KEY constraint on id column so that this
--- situation does not arise again.
-ALTER TABLE bot_logs_statehash
-ADD COLUMN temp_id SERIAL PRIMARY KEY;
-
-DELETE FROM bot_logs_statehash AS bls
-USING bot_logs_statehash AS helper
-WHERE bls.id = helper.id
-AND bls.temp_id > helper.temp_id;
-
-ALTER TABLE bot_logs_statehash
-DROP COLUMN temp_id;
-
 ALTER TABLE bot_logs_statehash
 ALTER COLUMN  statehash_id SET NOT NULL;
 
@@ -134,9 +77,6 @@ ADD FOREIGN KEY (statehash_id) REFERENCES statehash(id);
 
 ALTER TABLE bot_logs_statehash
 ADD FOREIGN KEY (parent_statehash_id) REFERENCES statehash(id);
-
-ALTER TABLE bot_logs_statehash
-ADD PRIMARY KEY (id);
 
 -- score_history:
 
