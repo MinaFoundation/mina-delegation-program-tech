@@ -533,13 +533,18 @@ def wait_for_verifications(ctx):
     start_time = datetime.now()
     keyspace_subs = keyspace_get_submissions()
     keyspace_verified_subs = [sub for sub in keyspace_subs if sub["verified"]]
+    # subs for genesis_block have dummy proof so they return validation_error = (Pickles.verify dlog_check)
+    # they will not be verified in postgres, so we will exclude them from the assertion
+    keyspace_subs_to_verify = [
+        sub
+        for sub in keyspace_verified_subs
+        if sub["validation_error"] != "(Pickles.verify dlog_check)"
+    ]
     _, postgres_verified_subs_num = postgres_get_data()
 
     while not (
-        len(keyspace_verified_subs)
-        == len(keyspace_subs)
-        == postgres_verified_subs_num
-        > 0
+        len(keyspace_verified_subs) == len(keyspace_subs) > 0
+        and postgres_verified_subs_num == len(keyspace_subs_to_verify) > 0
     ):
         current_time = datetime.now()
         elapsed_time = (current_time - start_time).total_seconds()
@@ -563,6 +568,9 @@ def wait_for_verifications(ctx):
 
     print(
         f"All submissions have been verified (keyspace / keyspace_verified / postgres_verified): {len(keyspace_subs)} / {len(keyspace_verified_subs)} / {postgres_verified_subs_num}"
+    )
+    print(
+        f"Genesis block submissions ({len(keyspace_subs_to_verify)}) are not included in the postgres_verified count."
     )
 
 
