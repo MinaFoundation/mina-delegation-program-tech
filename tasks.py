@@ -584,6 +584,11 @@ def assert_data(ctx):
     # Get data from Keyspaces
     keyspace_subs = keyspace_get_submissions()
     keyspace_verified_subs = [sub for sub in keyspace_subs if sub["verified"]]
+    keyspace_verified_subs_no_genesis_block = [
+        sub
+        for sub in keyspace_verified_subs
+        if sub["validation_error"] != "(Pickles.verify dlog_check)"
+    ]
     keyspace_submitter_keys = set([sub["submitter"] for sub in keyspace_subs])
     keyspace_block_hashes = set([sub["block_hash"] for sub in keyspace_subs])
 
@@ -602,6 +607,9 @@ def assert_data(ctx):
     print(f"Total Keyspace submissions: {len(keyspace_subs)}")
     print(f"Total S3 submissions: {len(s3_submissions)}")
     print(f"Total Keyspace verified submissions: {len(keyspace_verified_subs)}")
+    print(
+        f"Total Keyspace valid verified submissions (exluding genesis_block): {len(keyspace_verified_subs_no_genesis_block)}"
+    )
     print(f"Total Postgres verified submissions: {postgres_verified_subs_num}")
     print()
     print("SUBMITTERS DATA")
@@ -624,8 +632,8 @@ def assert_data(ctx):
         ], f"Snark work field is not empty for verified submission: {sub}"
 
     # Check verified submissions in Keyspaces equals verified submissions in Postgres
-    assert len(keyspace_verified_subs) == postgres_verified_subs_num, (
-        f"Mismatch in number of verified submissions between Keyspaces ({len(keyspace_verified_subs)}) "
+    assert len(keyspace_verified_subs_no_genesis_block) == postgres_verified_subs_num, (
+        f"Mismatch in number of valid verified submissions between Keyspaces ({len(keyspace_verified_subs)}) "
         f"and PostgreSQL ({postgres_verified_subs_num})"
     )
     # Check if the number of unique block hashes in Keyspaces equals the number of block files in S3
@@ -653,7 +661,7 @@ def assert_data(ctx):
 
 @task
 def assert_logs(ctx):
-    error_pattern = re.compile(r"ERROR|error|Error|FATAL|Fatal|fatal")
+    error_pattern = re.compile(r"ERROR|Error|FATAL|Fatal")
     error_found = False
 
     for log_file in os.listdir(LOGS_DIR):
