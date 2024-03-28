@@ -564,6 +564,11 @@ def wait_for_verifications(ctx):
 
         keyspace_subs = keyspace_get_submissions()
         keyspace_verified_subs = [sub for sub in keyspace_subs if sub["verified"]]
+        keyspace_subs_to_verify = [
+            sub
+            for sub in keyspace_verified_subs
+            if sub["validation_error"] != "(Pickles.verify dlog_check)"
+        ]
         _, postgres_verified_subs_num = postgres_get_data()
 
     print(
