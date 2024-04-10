@@ -1,9 +1,8 @@
 "A mock for a real Mina network."
+import csv
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-
-from data import BP_KEYS, LIBP2P_PEER_IDS
 
 
 @dataclass
@@ -29,4 +28,20 @@ class Node:
             }
         }
 
-NODES = list(Node(peer_id, bp) for bp, peer_id in zip(BP_KEYS, LIBP2P_PEER_IDS))
+def load_nodes(filename, count):
+    """Load at most [COUNT] nodes from a CSV file. Return a generator."""
+    with open(filename, 'r', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        if count is None:
+            for row in reader:
+                yield Node(row[0], row[1])
+        else:
+            returned_count = 0
+            for row in reader:
+                if returned_count < count:
+                    yield Node(row[0], row[1])
+                    returned_count += 1
+                else:
+                    return
+            if returned_count < count:
+                raise RuntimeError("Not enough BP keys in the file.")
