@@ -12,6 +12,8 @@ This top-level repository serves as a central tech hub for the Mina Delegation P
 
 4. **Submission Updater** ([Repository](https://github.com/MinaFoundation/submission-updater)): This is a wrapper over the [Stateless verifier tool](https://github.com/MinaProtocol/mina/tree/develop/src/app/delegation_verify) that is responsible for communication with Cassandra database. It will select a range of submissions from Cassandra, feed `stateless_verifier_tool` with it, collect results and update submissions with gathered data. Typically `submission_updater` and `stateless_verifer_tool` are packaged into single docker image and work together as one component of the system.
 
+5. **Leaderboard UI** ([Repository](https://github.com/MinaFoundation/delegation-program-leaderboard)): Website presenting block producer's availability scores. 
+
 ## Testing
 
 As the overarching repository, this is also the home for end-to-end/system and load tests that validate the entire system's functionality. These tests are crucial for ensuring that each component of the Mina Delegation Program interacts seamlessly and performs as expected. A robust testing approach helps in identifying potential bottlenecks and ensures that the system can handle real-world use cases efficiently.
