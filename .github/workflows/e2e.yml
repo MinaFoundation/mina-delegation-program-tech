@@ -19,6 +19,12 @@ on:
         description: 'STATELESS_VERIFIER_IMAGE'
         required: true
         default: '673156464838.dkr.ecr.us-west-2.amazonaws.com/delegation-verify:2.0.0rc2-delegation_verify_over_stdin_rc_base-230f610'
+      submission_storage:
+        description: 'SUBMISSION_STORAGE'
+        required: true
+        type: choice
+        options: ['POSTGRES', 'CASSANDRA']
+        default: 'POSTGRES'
       no_checks:
           description: 'env NO_CHECKS, set to 1 to run stateless verification with --no-checks'
           required: true

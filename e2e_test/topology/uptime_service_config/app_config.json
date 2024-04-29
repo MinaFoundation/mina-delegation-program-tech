@@ -9,6 +9,14 @@
     "access_key_id": "{{aws_access_key_id}}",
     "secret_access_key": "{{aws_secret_access_key}}"
   },
+  "postgresql": {
+    "user": "postgres",
+    "password": "postgres",
+    "host": "postgres-e2e",
+    "port": 5432,
+    "database": "coordinator",
+    "sslmode": "disable"
+  },
   "aws": {
     "account_id": "{{aws_account_id}}",
     "bucket_name_suffix": "{{bucket_name_suffix}}",

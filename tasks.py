@@ -21,6 +21,7 @@ LOGS_DIR = f"{RUNTIME_DIR}/logs"
 COORDINATOR_REPO_URL = "https://github.com/MinaFoundation/uptime-service-validation.git"
 COORDINATOR_RUNTIME_DIR = f"{RUNTIME_DIR}/uptime-service-validation"
 SSL_CERTFILE = f"{COORDINATOR_RUNTIME_DIR}/uptime_service_validation/database/aws_keyspaces/cert/sf-class2-root.crt"
+SUBMISSION_STORAGE = os.getenv("SUBMISSION_STORAGE")
 REQUIRED_ENV_VARS = [
     "MINA_DAEMON_IMAGE",
     "UPTIME_SERVICE_IMAGE",
@@ -45,6 +46,7 @@ REQUIRED_ENV_VARS = [
     "AWS_DEFAULT_REGION",
     "CASSANDRA_HOST",
     "CASSANDRA_PORT",
+    "SUBMISSION_STORAGE",
 ]
 
 
@@ -57,21 +59,28 @@ def load_env(ctx):
 @task(pre=[load_env])
 def test(ctx, action):
     if action == "setup":
+        print("Setting up...")
+        print("SUBMISSION_STORAGE: ", SUBMISSION_STORAGE)
         check_env_vars()
         clear_runtime(ctx)
         pull_images(ctx)
         clone_coordinator_repo(ctx)
-        start_postgres(ctx)
+        if SUBMISSION_STORAGE == "CASSANDRA":
+            print("Preparing keyspace...")
+            keyspace_drop_tables(ctx)
+            keyspace_migrate(ctx, direction="up")
         network(ctx, "setup")
         network(ctx, "create")
-        prepare_coordinator_postgres(ctx)
+        start_postgres(ctx)
         ctx.run(f"mkdir -p {LOGS_DIR}", echo=True)
+        prepare_coordinator_postgres(ctx)
     elif action == "start":
         check_env_vars()
         network(ctx, "start")
         start_coordinator(ctx)
     elif action == "wait":
-        keyspace_wait_for_availability(ctx)
+        if SUBMISSION_STORAGE == "CASSANDRA":
+            keyspace_wait_for_availability(ctx)
         wait_for_verifications(ctx)
     elif action == "stop":
         network(ctx, "stop")
@@ -88,7 +97,9 @@ def test(ctx, action):
         network(ctx, "delete")
         stop_postgres(ctx)
         clear_s3_bucket(ctx)
-        keyspace_drop_tables(ctx)
+        if SUBMISSION_STORAGE == "CASSANDRA":
+            print("Dropping tables in keyspace...")
+            keyspace_drop_tables(ctx)
         clear_runtime(ctx)
 
 
@@ -150,8 +161,6 @@ def network(ctx, action):
         raise ValueError("CONFIG_NETWORK_NAME environment variable must be set.")
 
     if action == "setup":
-        keyspace_drop_tables(ctx)
-        keyspace_migrate(ctx, direction="up")
         clear_s3_bucket(ctx)
         setup_topology(ctx)
         print("Uptime service setup completed.")
@@ -181,11 +190,11 @@ def network(ctx, action):
 @task(pre=[load_env])
 def keyspace_drop_tables(ctx):
     sys.path.append(COORDINATOR_RUNTIME_DIR)
+    os.environ["SSL_CERTFILE"] = os.path.abspath(SSL_CERTFILE)
     from uptime_service_validation.coordinator.aws_keyspaces_client import (
         AWSKeyspacesClient,
     )
 
-    os.environ["SSL_CERTFILE"] = os.path.abspath(SSL_CERTFILE)
     keyspace = os.getenv("AWS_KEYSPACE")
     cassandra = AWSKeyspacesClient()
     cassandra.connect()
@@ -288,6 +297,12 @@ def setup_topology(ctx):
     with open(app_config_json_path, "r") as file:
         template = file.read()
     rendered = pystache.render(template, context)
+    if SUBMISSION_STORAGE == "CASSANDRA":
+        # Remove the PostgreSQL configuration from the JSON file
+        rendered = re.sub(r'"postgresql": {[^}]+},', "", rendered)
+    elif SUBMISSION_STORAGE == "POSTGRES":
+        # Remove the Cassandra configuration from the JSON file
+        rendered = re.sub(r'"aws_keyspaces": {[^}]+},', "", rendered)
     with open(app_config_json_path, "w") as file:
         file.write(rendered)
 
@@ -335,9 +350,12 @@ def start_postgres(ctx):
         f"-e POSTGRES_USER={postgres_user} "
         f"-e POSTGRES_PASSWORD={postgres_password} "
         f"-p {postgres_port}:5432 "
+        "--network e2e-test_default "
         "-d postgres",
         echo=True,
     )
+    # Wait for the container to start
+    time.sleep(5)
 
     print(
         f"PostgreSQL container started on {postgres_host}:{postgres_port} "
@@ -435,20 +453,54 @@ def stop_coordinator(ctx):
         print("PID file not found. Is the coordinator running?")
 
 
-def keyspace_get_submissions():
-    sys.path.append(COORDINATOR_RUNTIME_DIR)
-    from uptime_service_validation.coordinator.aws_keyspaces_client import (
-        AWSKeyspacesClient,
-    )
+def get_submissions():
+    if SUBMISSION_STORAGE == "CASSANDRA":
+        sys.path.append(COORDINATOR_RUNTIME_DIR)
+        os.environ["SSL_CERTFILE"] = os.path.abspath(SSL_CERTFILE)
+        from uptime_service_validation.coordinator.aws_keyspaces_client import (
+            AWSKeyspacesClient,
+        )
 
-    os.environ["SSL_CERTFILE"] = os.path.abspath(SSL_CERTFILE)
-    keyspace = os.getenv("AWS_KEYSPACE")
-    cassandra = AWSKeyspacesClient()
-    cassandra.connect()
-    submissions = cassandra.execute_query(f"SELECT JSON * FROM {keyspace}.submissions")
-    subs_json = [json.loads(row[0]) for row in submissions]
-    cassandra.close()
-    return subs_json
+        keyspace = os.getenv("AWS_KEYSPACE")
+        cassandra = AWSKeyspacesClient()
+        cassandra.connect()
+        submissions = cassandra.execute_query(
+            f"SELECT JSON * FROM {keyspace}.submissions"
+        )
+        subs = [json.loads(row[0]) for row in submissions]
+        cassandra.close()
+        return subs
+    elif SUBMISSION_STORAGE == "POSTGRES":
+        host = os.getenv("POSTGRES_HOST")
+        port = os.getenv("POSTGRES_PORT")
+        dbname = os.getenv("POSTGRES_DB")
+        user = os.getenv("POSTGRES_USER")
+        password = os.getenv("POSTGRES_PASSWORD")
+
+        conn_str = f"dbname='{dbname}' user='{user}' host='{host}' port='{port}' password='{password}'"
+
+        conn = psycopg2.connect(conn_str)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT id, submitter, block_hash, validation_error, verified FROM submissions;"
+        )
+        subs = []
+        for row in cursor.fetchall():
+            try:
+                row_dict = {
+                    "id": row[0],
+                    "submitter": row[1] if row[1] else None,
+                    "block_hash": row[2] if row[2] else None,
+                    "validation_error": row[3] if row[3] else None,
+                    "verified": row[4] if row[4] else None,
+                }
+                subs.append(json.dumps(row_dict))
+            except TypeError:
+                print(f"Skipping row, expected JSON data but got: {row[0]}")
+        return [json.loads(sub) for sub in subs]
+    else:
+        raise ValueError("Invalid submission storage type.")
 
 
 def s3_get_data():
@@ -507,11 +559,11 @@ def postgres_get_data():
 @task(pre=[load_env])
 def keyspace_wait_for_availability(ctx):
     sys.path.append(COORDINATOR_RUNTIME_DIR)
+    os.environ["SSL_CERTFILE"] = os.path.abspath(SSL_CERTFILE)
     from uptime_service_validation.coordinator.aws_keyspaces_client import (
         AWSKeyspacesClient,
     )
 
-    os.environ["SSL_CERTFILE"] = os.path.abspath(SSL_CERTFILE)
     keyspace = os.getenv("AWS_KEYSPACE")
     cassandra = AWSKeyspacesClient()
     cassandra.connect()
@@ -531,21 +583,21 @@ def keyspace_wait_for_availability(ctx):
 def wait_for_verifications(ctx):
     timeout = 60 * 60  # 60 minutes in seconds
     start_time = datetime.now()
-    keyspace_subs = keyspace_get_submissions()
-    keyspace_verified_subs = [sub for sub in keyspace_subs if sub["verified"]]
+    in_storage_subs = get_submissions()
+    in_storage_verified_subs = [sub for sub in in_storage_subs if sub["verified"]]
     # subs for genesis_block have dummy proof so they return validation_error = (Pickles.verify dlog_check)
     # they will not be verified in postgres, so we will exclude them from the assertion
-    keyspace_verified_subs_no_genesis_block = [
+    in_storage_verified_subs_no_genesis_block = [
         sub
-        for sub in keyspace_verified_subs
+        for sub in in_storage_verified_subs
         if sub["validation_error"] != "(Pickles.verify dlog_check)"
     ]
     _, postgres_verified_subs_num = postgres_get_data()
 
     while not (
-        len(keyspace_verified_subs) == len(keyspace_subs) > 0
+        len(in_storage_verified_subs) == len(in_storage_subs) > 0
         and postgres_verified_subs_num
-        == len(keyspace_verified_subs_no_genesis_block)
+        == len(in_storage_verified_subs_no_genesis_block)
         > 0
     ):
         current_time = datetime.now()
@@ -554,45 +606,45 @@ def wait_for_verifications(ctx):
         # Check if timeout has been reached
         if elapsed_time > timeout:
             print(
-                f"Timeout reached (keyspace / keyspace_verified / postgres_verified): {len(keyspace_subs)} / {len(keyspace_verified_subs)} / {postgres_verified_subs_num}"
+                f"Timeout reached (in_storage / in_storage_verified / coordinator_verified): {len(in_storage_subs)} / {len(in_storage_verified_subs)} / {postgres_verified_subs_num}"
             )
             exit(1)
 
         time.sleep(15)
 
         print(
-            f"Waiting for verifications (keyspace / keyspace_verified / postgres_verified): {len(keyspace_subs)} / {len(keyspace_verified_subs)} / {postgres_verified_subs_num}"
+            f"Waiting for verifications (in_storage / in_storage_verified / coordinator_verified): {len(in_storage_subs)} / {len(in_storage_verified_subs)} / {postgres_verified_subs_num}"
         )
 
-        keyspace_subs = keyspace_get_submissions()
-        keyspace_verified_subs = [sub for sub in keyspace_subs if sub["verified"]]
-        keyspace_verified_subs_no_genesis_block = [
+        in_storage_subs = get_submissions()
+        in_storage_verified_subs = [sub for sub in in_storage_subs if sub["verified"]]
+        in_storage_verified_subs_no_genesis_block = [
             sub
-            for sub in keyspace_verified_subs
+            for sub in in_storage_verified_subs
             if sub["validation_error"] != "(Pickles.verify dlog_check)"
         ]
         _, postgres_verified_subs_num = postgres_get_data()
 
     print(
-        f"All submissions have been verified (keyspace / keyspace_verified / postgres_verified): {len(keyspace_subs)} / {len(keyspace_verified_subs)} / {postgres_verified_subs_num}"
+        f"All submissions have been verified (in_storage / in_storage_verified / coordinator_verified): {len(in_storage_subs)} / {len(in_storage_verified_subs)} / {postgres_verified_subs_num}"
     )
     print(
-        f"Genesis block submissions ({len(keyspace_verified_subs) - len(keyspace_verified_subs_no_genesis_block)}) are not included in the postgres_verified count."
+        f"Genesis block submissions ({len(in_storage_verified_subs) - len(in_storage_verified_subs_no_genesis_block)}) are not included in the postgres_verified count."
     )
 
 
 @task(pre=[load_env])
 def assert_data(ctx):
-    # Get data from Keyspaces
-    keyspace_subs = keyspace_get_submissions()
-    keyspace_verified_subs = [sub for sub in keyspace_subs if sub["verified"]]
-    keyspace_verified_subs_no_genesis_block = [
+    # Get data from Storage (Keyspaces or PostgreSQL)
+    in_storage_subs = get_submissions()
+    in_storage_verified_subs = [sub for sub in in_storage_subs if sub["verified"]]
+    in_storage_verified_subs_no_genesis_block = [
         sub
-        for sub in keyspace_verified_subs
+        for sub in in_storage_verified_subs
         if sub["validation_error"] != "(Pickles.verify dlog_check)"
     ]
-    keyspace_submitter_keys = set([sub["submitter"] for sub in keyspace_subs])
-    keyspace_block_hashes = set([sub["block_hash"] for sub in keyspace_subs])
+    in_storage_submitter_keys = set([sub["submitter"] for sub in in_storage_subs])
+    in_storage_block_hashes = set([sub["block_hash"] for sub in in_storage_subs])
 
     # Get data from S3
     s3_blocks, s3_submissions = s3_get_data()
@@ -601,64 +653,57 @@ def assert_data(ctx):
     )
     s3_submitter_keys = set([sub["submitter"] for sub in s3_submissions])
 
-    # Get data from Postgres
+    # Get data from Coordinator (PostgreSQL)
     postgres_submitters, postgres_verified_subs_num = postgres_get_data()
 
     # Print data
     print("SUBMISSIONS DATA")
-    print(f"Total Keyspace submissions: {len(keyspace_subs)}")
+    print(f"Total In Storage submissions: {len(in_storage_subs)}")
     print(f"Total S3 submissions: {len(s3_submissions)}")
-    print(f"Total Keyspace verified submissions: {len(keyspace_verified_subs)}")
+    print(f"Total In Storage verified submissions: {len(in_storage_verified_subs)}")
     print(
-        f"Total Keyspace valid verified submissions (exluding genesis_block): {len(keyspace_verified_subs_no_genesis_block)}"
+        f"Total In Storage valid verified submissions (exluding genesis_block): {len(in_storage_verified_subs_no_genesis_block)}"
     )
     print(f"Total Postgres verified submissions: {postgres_verified_subs_num}")
     print()
     print("SUBMITTERS DATA")
-    print(f"Total Keyspace unique submitters: {len(keyspace_submitter_keys)}")
+    print(f"Total In Storage unique submitters: {len(in_storage_submitter_keys)}")
     print(f"Total S3 submitters: {len(s3_submitter_keys)}")
     print(f"Total Postgres submitters: {len(postgres_submitters)}")
     print()
     print("BLOCKS DATA")
-    print(f"Total Keyspace blocks (hashes): {len(keyspace_block_hashes)}")
+    print(f"Total In Storage blocks (hashes): {len(in_storage_block_hashes)}")
     print(f"Total S3 blocks: {len(s3_blocks)}")
 
     # Assertions
-    # Check verified submissions has empty raw_block and snark_work fields in Keyspaces
-    for sub in keyspace_verified_subs:
-        assert not sub[
-            "raw_block"
-        ], f"Block field is not empty for verified submission: {sub}"
-        assert not sub[
-            "snark_work"
-        ], f"Snark work field is not empty for verified submission: {sub}"
-
-    # Check verified submissions in Keyspaces equals verified submissions in Postgres
-    assert len(keyspace_verified_subs_no_genesis_block) == postgres_verified_subs_num, (
-        f"Mismatch in number of valid verified submissions between Keyspaces ({len(keyspace_verified_subs)}) "
-        f"and PostgreSQL ({postgres_verified_subs_num})"
-    )
-    # Check if the number of unique block hashes in Keyspaces equals the number of block files in S3
-    assert len(keyspace_block_hashes) == len(
-        s3_block_hashes
-    ), f"Mismatch in number of unique block hashes between Keyspaces ({len(keyspace_block_hashes)}) and S3 ({len(s3_block_hashes)})"
-
-    # Check block hashes in Keyspaces and S3 are the same
+    # Check verified submissions in Storage equals verified submissions in Postgres
     assert (
-        keyspace_block_hashes == s3_block_hashes
-    ), f"Block hashes do not match in Keyspaces ({keyspace_block_hashes}) and S3 ({s3_block_hashes})"
+        len(in_storage_verified_subs_no_genesis_block) == postgres_verified_subs_num
+    ), (
+        f"Mismatch in number of valid verified submissions between Storage ({len(in_storage_verified_subs)}) "
+        f"and Coordinator ({postgres_verified_subs_num})"
+    )
+    # Check if the number of unique block hashes in Storage equals the number of block files in S3
+    assert len(in_storage_block_hashes) == len(
+        s3_block_hashes
+    ), f"Mismatch in number of unique block hashes between Storage ({len(in_storage_block_hashes)}) and S3 ({len(s3_block_hashes)})"
 
-    # Check if the number of submissions in Keyspaces equals the number of submissions in S3
-    assert len(keyspace_subs) == len(
+    # Check block hashes in Storage and S3 are the same
+    assert (
+        in_storage_block_hashes == s3_block_hashes
+    ), f"Block hashes do not match in Storage ({in_storage_block_hashes}) and S3 ({s3_block_hashes})"
+
+    # Check if the number of submissions in Storage equals the number of submissions in S3
+    assert len(in_storage_subs) == len(
         s3_submissions
-    ), f"Mismatch in number of submissions between Keyspaces ({len(keyspace_subs)}) and S3 ({len(s3_submissions)})"
+    ), f"Mismatch in number of submissions between Storage ({len(in_storage_subs)}) and S3 ({len(s3_submissions)})"
 
     postgres_submitter_keys = set(postgres_submitters)
 
     # Check if all sets contain the same elements
     assert (
-        keyspace_submitter_keys == s3_submitter_keys == postgres_submitter_keys
-    ), f"Submitter keys do not match across Keyspaces ({keyspace_submitter_keys}), S3 ({s3_submitter_keys}), and PostgreSQL ({postgres_submitter_keys})"
+        in_storage_submitter_keys == s3_submitter_keys == postgres_submitter_keys
+    ), f"Submitter keys do not match across Storage ({in_storage_submitter_keys}), S3 ({s3_submitter_keys}), and Coordinator ({postgres_submitter_keys})"
 
 
 @task

@@ -31,6 +31,7 @@ Before starting make sure to have following env variables set:
  - `UPTIME_SERVICE_IMAGE` - uptime service image to test against.
  - `COORDINATOR_BRANCH` - uptime service validation (coordinator) branch/tag to test against.
  - `STATELESS_VERIFIER_IMAGE` - stateless verifier image to test against.
+ - `SUBMISSION_STORAGE` - set to `POSTGRES` or `CASSANDRA`, depending on which storage option you want to test.
 
 1. **Test Setup (`invoke test setup`)**: This command prepares the testing environment. It involves setting up the Amazon Keyspaces database, ensuring the S3 bucket is empty, configuring the Postgres database, and initializing the Mina network along with the uptime service backend, coordinator, and stateless_verifier.
 
