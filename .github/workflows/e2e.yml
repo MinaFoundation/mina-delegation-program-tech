@@ -36,6 +36,7 @@ env:
   UPTIME_SERVICE_IMAGE: ${{ github.event.inputs.uptime_service_image }}
   COORDINATOR_BRANCH: ${{ github.event.inputs.coordinator_branch }}
   STATELESS_VERIFIER_IMAGE: ${{ github.event.inputs.stateless_verifier_image }}
+  SUBMISSION_STORAGE: ${{ github.event.inputs.submission_storage }}
   E2E_SECRET: ${{ secrets.E2E_SECRET }}
   AWS_ROLE_ARN: ''
 
