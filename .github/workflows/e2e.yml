@@ -10,15 +10,15 @@ on:
       uptime_service_image:
         description: 'UPTIME_SERVICE_IMAGE'
         required: true
-        default: '673156464838.dkr.ecr.us-west-2.amazonaws.com/uptime-service-backend:2.0.0rc7-5fba917'
+        default: '673156464838.dkr.ecr.us-west-2.amazonaws.com/uptime-service-backend:2.0.0rc8'
       coordinator_branch:
         description: 'COORDINATOR_BRANCH'
         required: true
-        default: '2.0.0rc3'
+        default: '2.0.0rc4'
       stateless_verifier_image:
         description: 'STATELESS_VERIFIER_IMAGE'
         required: true
-        default: '673156464838.dkr.ecr.us-west-2.amazonaws.com/delegation-verify:2.0.0rc2-delegation_verify_over_stdin_rc_base-230f610'
+        default: '673156464838.dkr.ecr.us-west-2.amazonaws.com/delegation-verify:2.0.0rc3-80a404f'
       submission_storage:
         description: 'SUBMISSION_STORAGE'
         required: true
