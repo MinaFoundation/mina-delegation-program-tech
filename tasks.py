@@ -546,7 +546,9 @@ def postgres_get_data():
     postgres_submitters = [row[0] for row in cursor.fetchall()]
 
     # Fetching postgres_verified_subs
-    cursor.execute("SELECT SUM(files_processed) FROM bot_logs;")
+    cursor.execute(
+        "SELECT SUM(files_processed) FROM bot_logs WHERE files_processed > -1;"
+    )
     postgres_verified_subs_num = cursor.fetchone()[0]
 
     # Close the cursor and the connection
