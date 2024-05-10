@@ -32,9 +32,13 @@ class Scheduler:
     block from the provided list. When that list is exhausted,
     iteration stops."""
 
-    def __init__(self, nodes, block_reader,
-                 block_time=timedelta(minutes=3),
-                 submission_time=timedelta(minutes=1)):
+    def __init__(
+        self,
+        nodes,
+        block_reader,
+        block_time=timedelta(minutes=3),
+        submission_time=timedelta(minutes=1),
+    ):
         "Initialize the scheduler."
         self.block_reader = block_reader
         self.nodes = itertools.cycle(nodes)
@@ -88,15 +92,26 @@ def parse_args():
     p.add_argument("--block-s3-bucket", help="S3 bucket where blocks are stored.")
     p.add_argument("--block-s3-dir", help="S3 directory where blocks are stored.")
     p.add_argument("--block-time", default=180, type=int, help="Block time in seconds.")
-    p.add_argument("--submission-time", default=60, type=int,
-                   help="Interval between subsequent submissions.")
-    p.add_argument("--block-producers-file", default=default_bp_file,
-                   help="A CSV file with block producers public keys.")
-    p.add_argument("--block-producer-count", type=int,
-                   help="""Number of block producers to use
-(cannot be bigger than available keys in the file).""")
+    p.add_argument(
+        "--submission-time",
+        default=60,
+        type=int,
+        help="Interval between subsequent submissions.",
+    )
+    p.add_argument(
+        "--block-producers-file",
+        default=default_bp_file,
+        help="A CSV file with block producers public keys.",
+    )
+    p.add_argument(
+        "--block-producer-count",
+        type=int,
+        help="""Number of block producers to use
+(cannot be bigger than available keys in the file).""",
+    )
     p.add_argument("uptime_service_url")
     return p.parse_args()
+
 
 def main(args):
     """Generate submissions for the uptime service."""
@@ -107,23 +122,27 @@ def main(args):
     else:
         raise RuntimeError("No block storage provided!")
 
-    nodes = tuple(network.load_nodes(args.block_producers_file, args.block_producer_count))
+    nodes = tuple(
+        network.load_nodes(args.block_producers_file, args.block_producer_count)
+    )
 
     scheduler = Scheduler(
         nodes,
         block_reader,
         block_time=timedelta(seconds=args.block_time),
-        submission_time=timedelta(seconds=args.submission_time)
+        submission_time=timedelta(seconds=args.submission_time),
     )
     for node in scheduler:
         sub = node.submission(scheduler.read_block())
         now = datetime.now(timezone.utc)
-        print(f"{now}: Submitting block {scheduler.current_block} for {node.public_key}...")
+        print(
+            f"{now}: Submitting block {scheduler.current_block} for {node.public_key}..."
+        )
         try:
-            r = requests.post(args.uptime_service_url, json=sub, timeout=1.0)
+            r = requests.post(args.uptime_service_url, json=sub, timeout=5.0)
             json.dump(r.json(), sys.stdout, indent=2)
         except requests.exceptions.ConnectionError as e:
-            json.dump({"error": str(e), "bp": sub['submitter']}, sys.stdout, indent=2)
+            json.dump({"error": str(e), "bp": sub["submitter"]}, sys.stdout, indent=2)
     print("Done.")
 
 
