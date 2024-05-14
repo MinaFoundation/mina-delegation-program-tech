@@ -6,8 +6,6 @@ DROP TABLE bp_ip_address_2022_12;
 
 DROP TABLE nodes_sidecar;
 
-DROP TABLE points_summary;
-
 --bot_logs:
 
 DELETE FROM bot_logs
