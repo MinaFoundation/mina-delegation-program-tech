@@ -10,9 +10,13 @@ This top-level repository serves as a central tech hub for the Mina Delegation P
 
 3. **Stateless Verification Tool** ([Repository](https://github.com/MinaProtocol/mina/tree/develop/src/app/delegation_verify)): This tool is essential for maintaining the integrity of submissions. It performs stateless verification against each submission to ascertain its validity. This verification process is critical in ensuring that only legitimate and accurate data influences the delegation scores.
 
-4. **Submission Updater** ([Repository](https://github.com/MinaFoundation/submission-updater)): This is a wrapper over the [Stateless verifier tool](https://github.com/MinaProtocol/mina/tree/develop/src/app/delegation_verify) that is responsible for communication with Cassandra database. It will select a range of submissions from Cassandra, feed `stateless_verifier_tool` with it, collect results and update submissions with gathered data. Typically `submission_updater` and `stateless_verifer_tool` are packaged into single docker image and work together as one component of the system.
+4. **Submission Updater** ([Repository](https://github.com/MinaFoundation/submission-updater)): This is a wrapper over the [Stateless verifier tool](https://github.com/MinaProtocol/mina/tree/develop/src/app/delegation_verify) that is responsible for communication with Cassandra or PostgreSQL, depending what it set as submission storage. It will select a range of submissions from the database, feed `stateless_verifier_tool` with it, collect results and update submissions with gathered data. Typically `submission_updater` and `stateless_verifer_tool` are packaged into single docker image and work together as one component of the system.
 
-5. **Leaderboard UI** ([Repository](https://github.com/MinaFoundation/delegation-program-leaderboard)): Website presenting block producer's availability scores. 
+5. **Leaderboard UI** ([Repository](https://github.com/MinaFoundation/delegation-program-leaderboard)): Website presenting block producer's availability scores.
+
+6. **Submission Report** ([Repository](https://github.com/MinaFoundation/submission-report)): Web application that provides an interface for querying and displaying report details for block producer submissions over specified time periods.
+
+
 
 ## Testing
 
