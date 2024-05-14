@@ -26,7 +26,7 @@ ALTER TABLE nodes
 ALTER COLUMN updated_at SET NOT NULL;
 
 ALTER TABLE nodes
-ALTER COLUMN score_percent TYPE NUMERIC(10, 2);
+ALTER COLUMN score_percent TYPE NUMERIC(5, 2);
 
 -- points:
 
@@ -92,7 +92,7 @@ ALTER TABLE score_history
 ADD COLUMN id SERIAL PRIMARY KEY;
 
 ALTER TABLE score_history
-ALTER COLUMN score_percent TYPE NUMERIC(10, 2);
+ALTER COLUMN score_percent TYPE NUMERIC(5, 2);
 
 -- statehash
 
