@@ -1,5 +1,5 @@
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 import psycopg2
 from psycopg2.sql import Literal
 
@@ -126,7 +126,9 @@ def main(args):
     statehash = Insert(conn, "statehash", ("id", "value"))
     statehash.fetch(
         "bl.batch_end_epoch >= trunc(extract(epoch from (%s)))",
-        (args.last_update,),
+        # We need to fetch the last statehash before the range (which is needed for the parent_statehash_id column)
+        # so let's fetch last_update - 60 minutes
+        (args.last_update - timedelta(minutes=60),),
         joins=(
             {
                 "tbl": "bot_logs_statehash",
