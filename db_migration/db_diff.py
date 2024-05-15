@@ -122,19 +122,6 @@ def main(args):
             {"tbl": "bot_logs", "as": "bl", "col": "id", "val": "bls.bot_log_id"},
         ),
     )
-    statehash.fetch(
-        "bl.batch_end_epoch >= trunc(extract(epoch from (%s)))",
-        (args.last_update,),
-        joins=(
-            {
-                "tbl": "bot_logs_statehash",
-                "as": "bls",
-                "col": "parent_statehash_id",
-                "val": "statehash.id",
-            },
-            {"tbl": "bot_logs", "as": "bl", "col": "id", "val": "bls.bot_log_id"},
-        ),
-    )
     statehash.print()
 
     bot_logs_statehash = Insert(
