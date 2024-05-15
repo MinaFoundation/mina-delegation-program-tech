@@ -28,17 +28,32 @@ class Insert:
         self.columns = columns
         self.results = []
 
-    def fetch(self, condition, args, joins=()):
+    def fetch_all(self):
+        with self.connection.cursor() as cursor:
+            q = "SELECT {} FROM {}".format(", ".join(self.columns), self.table)
+            # print("Executing query:", q)
+            cursor.execute(q)
+            self.results = cursor.fetchall()
+
+    def fetch(
+        self,
+        condition,
+        args,
+        joins=(),
+    ):
         cols = ", ".join("{}.{}".format(self.table, col) for col in self.columns)
         j = " ".join(
             "JOIN {tbl} AS {as} ON {as}.{col} = {val}".format(**join) for join in joins
         )
-        q = "SELECT DISTINCT {} FROM {} {} WHERE {} ORDER BY {}.{} LIMIT ALL"
+        q = "SELECT DISTINCT {} FROM {} {} WHERE {} ORDER BY {}.{} LIMIT ALL".format(
+            cols, self.table, j, condition, self.table, self.columns[0]
+        )
+
+        # print("Executing query:", q)
+        # print("With arguments:", args)
+
         with self.connection.cursor() as cursor:
-            cursor.execute(
-                q.format(cols, self.table, j, condition, self.table, self.columns[0]),
-                args,
-            )
+            cursor.execute(q, args)
             self.results += cursor.fetchall()
 
     def print(self):
@@ -156,19 +171,7 @@ def main(args):
             "application_status",
         ),
     )
-    nodes.fetch(
-        "bl.batch_end_epoch >= trunc(extract(epoch from (%s))) AND updated_at IS NOT NULL",
-        (args.last_update,),
-        joins=(
-            {"tbl": "points", "as": "p", "col": "node_id", "val": "nodes.id"},
-            {"tbl": "bot_logs", "as": "bl", "col": "id", "val": "p.bot_log_id"},
-        ),
-    )
-    for row in nodes.results:
-        if row[4] is None:
-            # we don't want NULLs in this column, so we have to insert something
-            # it doesn't really matter much anyways.
-            row[4] = "now()"
+    nodes.fetch_all()
     nodes.print()
 
     points = Insert(
