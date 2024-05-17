@@ -6,8 +6,6 @@ DROP TABLE bp_ip_address_2022_12;
 
 DROP TABLE nodes_sidecar;
 
-DROP TABLE points_summary;
-
 --bot_logs:
 
 DELETE FROM bot_logs
@@ -28,7 +26,7 @@ ALTER TABLE nodes
 ALTER COLUMN updated_at SET NOT NULL;
 
 ALTER TABLE nodes
-ALTER COLUMN score_percent TYPE NUMERIC(10, 2);
+ALTER COLUMN score_percent TYPE NUMERIC(5, 2);
 
 -- points:
 
@@ -94,7 +92,7 @@ ALTER TABLE score_history
 ADD COLUMN id SERIAL PRIMARY KEY;
 
 ALTER TABLE score_history
-ALTER COLUMN score_percent TYPE NUMERIC(10, 2);
+ALTER COLUMN score_percent TYPE NUMERIC(5, 2);
 
 -- statehash
 
@@ -112,5 +110,34 @@ WHERE id NOT IN (
   FROM points
   WHERE statehash_id IS NOT NULL
 );
+
+-- Table submission is used to store the submissions made by each submitter.
+CREATE TABLE IF NOT EXISTS submissions (
+	-- filled by uptime_service_backend
+    id SERIAL PRIMARY KEY,
+    submitted_at_date DATE NOT NULL,
+    submitted_at TIMESTAMP NOT NULL,
+    submitter TEXT NOT NULL,
+    created_at TIMESTAMP,
+    block_hash TEXT,
+    remote_addr TEXT,
+    peer_id TEXT,
+    snark_work BYTEA,
+    graphql_control_port INT,
+    built_with_commit_sha TEXT,
+	-- filled by zk-validator component
+    state_hash TEXT,
+    parent TEXT,
+    height INTEGER,
+    slot INTEGER,
+    validation_error TEXT,
+    verified BOOLEAN
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_submissions_submitter_date ON submissions USING btree (submitter, submitted_at);
+
+-- Additional indexes for better query performance
+CREATE INDEX IF NOT EXISTS idx_submissions_submitter_date ON submissions (submitter, submitted_at_date);
+CREATE INDEX IF NOT EXISTS idx_submissions_submitter_datetime ON submissions (submitter, submitted_at DESC);
+
 
 COMMIT;
