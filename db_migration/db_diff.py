@@ -1,5 +1,6 @@
 import argparse
 from datetime import datetime, timedelta
+import sys
 import psycopg2
 from psycopg2.sql import Literal
 
@@ -122,6 +123,10 @@ def main(args):
         (args.last_update,),
     )
     bot_logs.print()
+    print(
+        "Bot logs fetched: {} rows".format(len(bot_logs.results)),
+        file=sys.stderr,
+    )
 
     statehash = Insert(conn, "statehash", ("id", "value"))
     statehash.fetch(
@@ -140,6 +145,10 @@ def main(args):
         ),
     )
     statehash.print()
+    print(
+        "Statehash fetched: {} rows".format(len(statehash.results)),
+        file=sys.stderr,
+    )
 
     bot_logs_statehash = Insert(
         conn,
@@ -159,6 +168,10 @@ def main(args):
         ),
     )
     bot_logs_statehash.print()
+    print(
+        "Bot_logs_statehash fetched: {} rows".format(len(bot_logs_statehash.results)),
+        file=sys.stderr,
+    )
 
     nodes = Insert(
         conn,
@@ -175,6 +188,10 @@ def main(args):
     )
     nodes.fetch_all()
     nodes.print()
+    print(
+        "Nodes fetched: {} rows".format(len(nodes.results)),
+        file=sys.stderr,
+    )
 
     points = Insert(
         conn,
@@ -200,12 +217,20 @@ def main(args):
         ),
     )
     points.print()
+    print(
+        "Points fetched: {} rows".format(len(points.results)),
+        file=sys.stderr,
+    )
 
     score_history = Insert(
         conn, "score_history", ("node_id", "score_at", "score", "score_percent")
     )
     score_history.fetch("score_at >= %s AND score_at IS NOT NULL", (args.last_update,))
     score_history.print()
+    print(
+        "Score history fetched: {} rows".format(len(score_history.results)),
+        file=sys.stderr,
+    )
 
     print("COMMIT;")
 
