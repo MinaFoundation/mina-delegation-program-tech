@@ -18,7 +18,13 @@ NOTE: this will take several hours to execute (a lot of rows to drop and constra
 Under some circumstances (like e.g. an emergency hard fork) there might not be enough time to take a full Ontab database’s snapshot quickly (it takes several hours to produce) and then trim it (which takes another several hours). In that case a quicker approach can be used to synchronise the databases – the script linked below can be used to take a partial db dump (for increased speed) from the original database and move relevant records to the new database. The script can be run like this:
 
 ```bash
-$ python db_diff.py -H $HOST -p $PORT -U $USERNAME -w $PASSWORD -d leaderboard_snark $DATE
+$ python db_diff.py -H $HOST -p $PORT -U $USERNAME -w $PASSWORD -d leaderboard_snark -t all $DATE > dump.sql
+Bot logs fetched: 5932 rows
+Statehash fetched: 57165 rows
+Bot_logs_statehash fetched: 94737 rows
+Nodes fetched: 1495 rows
+Points fetched: 21950363 rows
+Score history fetched: 8584008 rows
 ```
 
 [db_diff.py](./db_diff.py)
@@ -32,5 +38,10 @@ Where:
 - `$DATE` is the day from which we want to take the diff (e.g. 2024-02-01). Only records added after that date will be dumped.
 
 NOTE: the script requires psycopg2 package downloaded from pip.
+You can dump data from all tables (`-t all`) or subset of supported tables (points, score_history, nodes, bot_logs, statehash, bot_logs_statehash), (e.g. `-t points,nodes`) 
 
-This script will produce some SQL commands on the standard output. Write it to a file and run the script against the target database in order to load the data. Or you can simply pipe it to the `psql` command.
+This script will produce some SQL commands on the standard output and log some information to the standard error. Write it to a file and run the script against the target database in order to load the data. For instance, assuming the target database `delegation_program` is on localhost:
+
+```bash
+psql -h localhost -p 5432 -U postgres -d delegation_program -f dump.sql
+```
