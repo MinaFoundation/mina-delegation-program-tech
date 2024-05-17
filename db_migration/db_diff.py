@@ -32,7 +32,6 @@ class Insert:
     def fetch_all(self):
         with self.connection.cursor() as cursor:
             q = "SELECT {} FROM {}".format(", ".join(self.columns), self.table)
-            # print("Executing query:", q)
             cursor.execute(q)
             self.results = cursor.fetchall()
 
@@ -49,23 +48,6 @@ class Insert:
         q = "SELECT DISTINCT {} FROM {} {} WHERE {} ORDER BY {}.{} {} LIMIT {}".format(
             cols, self.table, j, condition, self.table, self.columns[0], order_by, limit
         )
-
-        # Print the query template with placeholders
-        print("Executing query template:", q)
-        print("With arguments:", args)
-
-        # Replace placeholders with actual argument values for debugging
-        query_with_args = q
-        for arg in args:
-            if isinstance(arg, str):
-                arg = "'{}'".format(
-                    arg.replace("'", "''")
-                )  # Escape single quotes in strings
-            elif arg is None:
-                arg = "NULL"
-            query_with_args = query_with_args.replace("%s", str(arg), 1)
-
-        print("Full query with arguments:", query_with_args)
 
         with self.connection.cursor() as cursor:
             cursor.execute(q, args)
