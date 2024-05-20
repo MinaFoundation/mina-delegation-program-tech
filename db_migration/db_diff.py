@@ -50,6 +50,9 @@ class Insert:
         )
 
         with self.connection.cursor() as cursor:
+            # No timeout
+            cursor.execute("SET statement_timeout = '0';")
+            cursor.execute("SET idle_in_transaction_session_timeout = '0';")
             cursor.execute(q, args)
             self.results += cursor.fetchall()
 
