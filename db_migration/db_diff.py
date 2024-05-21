@@ -139,21 +139,7 @@ def main(args):
 
     if "all" in tables or "statehash" in tables:
         statehash = Insert(conn, "statehash", ("id", "value"))
-        statehash.fetch(
-            "bl.batch_end_epoch >= trunc(extract(epoch from (%s)))",
-            # We need to fetch the last statehash before the range (which is needed for the parent_statehash_id column)
-            # so let's fetch last_update - 60 minutes
-            (args.last_update - timedelta(minutes=60),),
-            joins=(
-                {
-                    "tbl": "bot_logs_statehash",
-                    "as": "bls",
-                    "col": "statehash_id",
-                    "val": "statehash.id",
-                },
-                {"tbl": "bot_logs", "as": "bl", "col": "id", "val": "bls.bot_log_id"},
-            ),
-        )
+        statehash.fetch_all()
         statehash.print()
         print(
             "Statehash fetched: {} rows".format(len(statehash.results)),
