@@ -14,7 +14,7 @@ on:
       coordinator_branch:
         description: 'COORDINATOR_BRANCH'
         required: true
-        default: '2.0.0rc4'
+        default: '2.0.0rc6'
       stateless_verifier_image:
         description: 'STATELESS_VERIFIER_IMAGE'
         required: true
