@@ -193,6 +193,37 @@ def main(args):
             file=sys.stderr,
         )
 
+    if "all" in tables or "submissions" in tables:
+        subs = Insert(
+            conn,
+            "submissions",
+            (
+                "id",
+                "submitted_at_date",
+                "submitted_at",
+                "submitter",
+                "created_at",
+                "block_hash",
+                "remote_addr",
+                "peer_id",
+                "snark_work",
+                "graphql_control_port",
+                "built_with_commit_sha",
+                "state_hash",
+                "parent",
+                "height",
+                "slot",
+                "validation_error",
+                "verified",
+            ),
+        )
+        subs.fetch_all()
+        subs.print()
+        print(
+            "Submissions fetched: {} rows".format(len(subs.results)),
+            file=sys.stderr,
+        )
+
     if "all" in tables or "points" in tables:
         points = Insert(
             conn,
